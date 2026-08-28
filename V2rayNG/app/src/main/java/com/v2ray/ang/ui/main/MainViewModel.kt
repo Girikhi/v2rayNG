@@ -18,6 +18,7 @@ import com.v2ray.ang.extension.matchesPattern
 import com.v2ray.ang.extension.moveItem
 import com.v2ray.ang.ui.base.BaseViewModel
 import com.v2ray.ang.util.LogUtil
+import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -191,6 +192,7 @@ class MainViewModel(
             is MainAction.RemoveServer -> removeServerAndRefresh(action.guid)
             is MainAction.Search -> filterConfig(action.query)
             is MainAction.ImportBatchConfig -> importBatchConfig(action.configText)
+            is MainAction.AddSubscription -> addSubscription(action.remarks, action.url)
             is MainAction.LocateHandled -> consumeLocateTarget(action.target)
             is MainAction.ShareQRCode -> {
                 val bitmap = dataSource.share2QRCode(action.guid)
@@ -438,6 +440,60 @@ class MainViewModel(
                 } catch (e: Exception) {
                     LogUtil.e(AppConfig.TAG, "Subscription update failed", e)
                     toastError(R.string.toast_failure)
+                }
+            }
+        }
+    }
+
+    private fun addSubscription(remarks: String, url: String) {
+        val cleanUrl = url.trim()
+        if (!Utils.isValidUrl(cleanUrl)) {
+            toast(R.string.toast_invalid_url)
+            return
+        }
+        if (!Utils.isValidSubUrl(cleanUrl)) {
+            toast(R.string.toast_insecure_url_protocol)
+            return
+        }
+        if (dataSource.getSubscriptions().any {
+                it.subscription.url.trim().equals(cleanUrl, ignoreCase = true)
+            }
+        ) {
+            toast(R.string.simple_subscription_exists)
+            return
+        }
+
+        val cleanRemarks = remarks.trim().ifEmpty {
+            runCatching { java.net.URI(cleanUrl).host }
+                .getOrNull()
+                ?.removePrefix("www.")
+                .orEmpty()
+                .ifEmpty { dataSource.getString(R.string.simple_default_subscription_name) }
+        }
+        val item = SubscriptionItem(remarks = cleanRemarks, url = cleanUrl)
+
+        launchLoading {
+            withContext(ioDispatcher) {
+                try {
+                    val subId = dataSource.addSubscription(item)
+                    dataSource.setSelectedSubscriptionId(subId)
+                    _uiState.update { it.copy(selectedGroupId = subId) }
+
+                    val result = dataSource.updateConfigViaSub(SubscriptionCache(subId, item))
+                    setupGroupTab(forceRefresh = true).join()
+                    refreshSelectedGuid()
+
+                    if (result.successCount > 0) {
+                        toast(dataSource.getString(R.string.title_update_config_count, result.configCount))
+                    } else {
+                        toastError(R.string.simple_subscription_update_failed)
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    LogUtil.e(AppConfig.TAG, "Failed to add subscription", error)
+                    setupGroupTab(forceRefresh = true).join()
+                    toastError(R.string.simple_subscription_update_failed)
                 }
             }
         }

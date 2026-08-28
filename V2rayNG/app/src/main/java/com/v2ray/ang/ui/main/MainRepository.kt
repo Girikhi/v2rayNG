@@ -142,6 +142,13 @@ class MainRepository(
     override fun getSubscriptionItem(id: String): SubscriptionItem? =
         MmkvManager.decodeSubscription(id)
 
+    override fun addSubscription(item: SubscriptionItem): String {
+        val subId = Utils.getUuid()
+        MmkvManager.encodeSubscription(subId, item)
+        SubscriptionUpdater.syncOne(app, subId)
+        return subId
+    }
+
     override fun getServerGuidList(groupId: String): List<String> =
         if (groupId.isEmpty()) {
             MmkvManager.decodeAllServerList()

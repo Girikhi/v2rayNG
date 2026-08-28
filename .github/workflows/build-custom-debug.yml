@@ -1,0 +1,84 @@
+name: Build Custom Debug APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "codex/**"
+    paths:
+      - ".github/workflows/build-custom-debug.yml"
+      - "V2rayNG/**"
+      - "AndroidLibXrayLite"
+      - "hev-socks5-tunnel"
+      - "compile-hevtun.sh"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: custom-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build installable APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source and submodules
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+          cache-dependency-path: |
+            V2rayNG/*.gradle.kts
+            V2rayNG/gradle/libs.versions.toml
+            V2rayNG/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: "14742923"
+          packages: "platforms;android-37.0 build-tools;37.0.0 platform-tools ndk;29.0.14206865"
+
+      - name: Build native tunnel libraries
+        run: |
+          export NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
+          bash compile-hevtun.sh
+
+      - name: Add native libraries to the Android app
+        run: cp -R libs V2rayNG/app/
+
+      - name: Download the V2Ray core library
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          core_tag="$(git -C AndroidLibXrayLite describe --tags --abbrev=0)"
+          mkdir -p V2rayNG/app/libs
+          gh release download "$core_tag" \
+            --repo 2dust/AndroidLibXrayLite \
+            --pattern libv2ray.aar \
+            --dir V2rayNG/app/libs
+
+      - name: Run unit tests and build F-Droid debug APK
+        working-directory: V2rayNG
+        run: |
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+          chmod +x gradlew
+          ./gradlew test assembleFdroidDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: v2rayNG-custom-debug
+          path: V2rayNG/app/build/outputs/apk/fdroid/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
