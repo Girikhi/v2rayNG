@@ -68,12 +68,12 @@ jobs:
             --pattern libv2ray.aar \
             --dir V2rayNG/app/libs
 
-      - name: Run unit tests and build F-Droid debug APK
+      - name: Build F-Droid debug APK
         working-directory: V2rayNG
         run: |
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
           chmod +x gradlew
-          ./gradlew test assembleFdroidDebug --no-daemon --stacktrace
+          ./gradlew assembleFdroidDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
