@@ -259,11 +259,7 @@ class MainActivity : HelperBaseActivity() {
             return
         }
 
-        val remarks = runCatching { URI(cleanUrl).host }
-            .getOrNull()
-            ?.removePrefix("www.")
-            .orEmpty()
-            .ifEmpty { getString(R.string.simple_default_subscription_name) }
+        val remarks = subscriptionNameFromLink(cleanUrl)
         val subscription = SubscriptionItem(remarks = remarks, url = cleanUrl)
         val subscriptionId = Utils.getUuid()
         MmkvManager.encodeSubscription(subscriptionId, subscription)
@@ -302,6 +298,25 @@ class MainActivity : HelperBaseActivity() {
         }
     }
 
+    /** Uses the human-readable name carried after # in the subscription link. */
+    private fun subscriptionNameFromLink(url: String): String {
+        return runCatching {
+            val uri = URI(url)
+            uri.fragment
+                ?.trim()
+                ?.lineSequence()
+                ?.firstOrNull()
+                ?.take(MAX_SUBSCRIPTION_NAME_LENGTH)
+                ?.takeIf { it.isNotEmpty() }
+                ?: uri.host
+                    ?.removePrefix("www.")
+                    ?.take(MAX_SUBSCRIPTION_NAME_LENGTH)
+                    .orEmpty()
+        }.getOrDefault("").ifEmpty {
+            getString(R.string.simple_default_subscription_name)
+        }
+    }
+
     private fun applyRunningState(isLoading: Boolean, isRunning: Boolean) {
         if (isLoading) {
             binding.fab.setImageResource(R.drawable.ic_fab_check)
@@ -311,14 +326,14 @@ class MainActivity : HelperBaseActivity() {
         if (isRunning) {
             binding.fab.setImageResource(R.drawable.ic_stop_24dp)
             binding.fab.backgroundTintList = ColorStateList.valueOf(
-                ContextCompat.getColor(this, R.color.md_theme_tertiary)
+                ContextCompat.getColor(this, R.color.color_fab_active)
             )
             binding.fab.contentDescription = getString(R.string.action_stop_service)
             setTestState(getString(R.string.simple_connected))
         } else {
             binding.fab.setImageResource(R.drawable.ic_play_24dp)
             binding.fab.backgroundTintList = ColorStateList.valueOf(
-                ContextCompat.getColor(this, R.color.md_theme_primary)
+                ContextCompat.getColor(this, R.color.color_fab_inactive)
             )
             binding.fab.contentDescription = getString(R.string.tasker_start_service)
             setTestState(getString(R.string.simple_tap_to_connect))
@@ -747,5 +762,6 @@ class MainActivity : HelperBaseActivity() {
     companion object {
         private const val ADD_FROM_CLIPBOARD = 1
         private const val ADD_FROM_QR_CODE = 2
+        private const val MAX_SUBSCRIPTION_NAME_LENGTH = 80
     }
 }
