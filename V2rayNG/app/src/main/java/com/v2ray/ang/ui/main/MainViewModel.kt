@@ -114,13 +114,7 @@ class MainViewModel(
                 _uiState.update { it.copy(status = MainStatus.ConnectionTest(event.result)) }
             }
 
-            MainServiceEvent.MeasureConfigSuccess -> {
-                viewModelScope.launch(ioDispatcher) {
-                    val gid = testingGroupId ?: uiState.value.selectedGroupId
-                    cacheMutex.withLock { groupDataCache.remove(gid) }
-                    updateGroupUi(gid, loadGroup(gid, forceRefresh = true))
-                }
-            }
+            is MainServiceEvent.MeasureConfigSuccess -> updateMeasuredDelay(event.guid)
 
             is MainServiceEvent.MeasureConfigNotify -> {
                 _uiState.update { it.copy(status = MainStatus.TestProgress(event.progress)) }
@@ -193,7 +187,7 @@ class MainViewModel(
             is MainAction.RemoveServer -> removeServerAndRefresh(action.guid)
             is MainAction.Search -> filterConfig(action.query)
             is MainAction.ImportBatchConfig -> importBatchConfig(action.configText)
-            is MainAction.AddSubscription -> addSubscription(action.remarks, action.url)
+            is MainAction.AddSubscription -> addSubscription(action.url)
             is MainAction.LocateHandled -> consumeLocateTarget(action.target)
             is MainAction.ShareQRCode -> {
                 val bitmap = dataSource.share2QRCode(action.guid)
@@ -210,6 +204,8 @@ class MainViewModel(
             MainAction.ImportClipboard,
             MainAction.ImportConfigLocal,
             is MainAction.ImportManually,
+            MainAction.AddSubscriptionFromClipboard,
+            MainAction.AddSubscriptionFromQrCode,
             MainAction.RestartService,
             MainAction.LocateSelectedServer,
             is MainAction.EditServer,
@@ -446,7 +442,7 @@ class MainViewModel(
         }
     }
 
-    private fun addSubscription(remarks: String, url: String) {
+    private fun addSubscription(url: String) {
         val cleanUrl = url.trim()
         if (!Utils.isValidUrl(cleanUrl)) {
             toast(R.string.toast_invalid_url)
@@ -464,13 +460,11 @@ class MainViewModel(
             return
         }
 
-        val cleanRemarks = remarks.trim().ifEmpty {
-            runCatching { java.net.URI(cleanUrl).host }
-                .getOrNull()
-                ?.removePrefix("www.")
-                .orEmpty()
-                .ifEmpty { dataSource.getString(R.string.simple_default_subscription_name) }
-        }
+        val cleanRemarks = runCatching { java.net.URI(cleanUrl).host }
+            .getOrNull()
+            ?.removePrefix("www.")
+            .orEmpty()
+            .ifEmpty { dataSource.getString(R.string.simple_default_subscription_name) }
         val item = SubscriptionItem(remarks = cleanRemarks, url = cleanUrl)
 
         launchLoading {
@@ -731,6 +725,24 @@ class MainViewModel(
     }
 
     // ---------- Testing ----------
+    private fun updateMeasuredDelay(guid: String) {
+        if (guid.isBlank()) return
+        viewModelScope.launch(ioDispatcher) {
+            val delayMillis = dataSource.decodeAffiliationInfo(guid)?.testDelayMillis
+                ?: return@launch
+            val groupId = testingGroupId ?: uiState.value.selectedGroupId
+            val updateServer: (ServersCache) -> ServersCache = { server ->
+                if (server.guid == guid) server.copy(testDelayMillis = delayMillis) else server
+            }
+            mutableServersForGroup(groupId).update { servers -> servers.map(updateServer) }
+            cacheMutex.withLock {
+                groupDataCache[groupId]?.let { cached ->
+                    groupDataCache[groupId] = cached.map(updateServer)
+                }
+            }
+        }
+    }
+
     fun cancelAllPing() {
         dataSource.cancelAllPing()
         testingGroupId = null
@@ -785,7 +797,11 @@ class MainViewModel(
 
     private fun onTestsFinished() {
         viewModelScope.launch(ioDispatcher) {
-            cacheMutex.withLock { groupDataCache.clear() }
+            val finishedGroupId = testingGroupId ?: uiState.value.selectedGroupId
+            cacheMutex.withLock {
+                if (finishedGroupId.isEmpty()) groupDataCache.clear()
+                else groupDataCache.remove(finishedGroupId)
+            }
             testingGroupId = null
             _uiState.update {
                 it.copy(
@@ -793,7 +809,12 @@ class MainViewModel(
                     status = if (it.isRunning) MainStatus.Connected else MainStatus.Disconnected
                 )
             }
-            reloadAllGroups(_uiState.value.groups.map { it.id })
+            val groupsToReload = if (finishedGroupId.isEmpty()) {
+                _uiState.value.groups.map { it.id }
+            } else {
+                listOf(finishedGroupId)
+            }
+            reloadAllGroups(groupsToReload)
         }
     }
 

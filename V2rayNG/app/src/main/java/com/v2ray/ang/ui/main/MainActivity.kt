@@ -110,6 +110,8 @@ class MainActivity : HelperBaseComponentActivity() {
                     MainAction.ImportClipboard -> importClipboard()
                     MainAction.ImportConfigLocal -> importConfigLocal()
                     is MainAction.ImportManually -> importManually(action.type)
+                    MainAction.AddSubscriptionFromClipboard -> addSubscriptionFromClipboard()
+                    MainAction.AddSubscriptionFromQrCode -> addSubscriptionFromQrCode()
                     MainAction.RestartService -> LauncherManager.restartServiceOrStart(this, ::requestServiceStart)
                     MainAction.LocateSelectedServer -> mainViewModel.triggerLocateSelectedServer()
                     is MainAction.SelectServer -> setSelectServer(action.guid)
@@ -230,6 +232,28 @@ class MainActivity : HelperBaseComponentActivity() {
             mainViewModel.onAction(MainAction.ImportBatchConfig(text))
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to import config from clipboard", e)
+        }
+    }
+
+    private fun addSubscriptionFromClipboard() {
+        try {
+            val url = Utils.getClipboard(this).trim()
+            if (url.isEmpty()) {
+                toast(R.string.toast_none_data_clipboard)
+                return
+            }
+            mainViewModel.onAction(MainAction.AddSubscription(url))
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "Failed to read subscription from clipboard", e)
+            toastError(R.string.toast_failure)
+        }
+    }
+
+    private fun addSubscriptionFromQrCode() {
+        launchQRCodeScanner { scanResult ->
+            scanResult?.trim()?.takeIf { it.isNotEmpty() }?.let { url ->
+                mainViewModel.onAction(MainAction.AddSubscription(url))
+            }
         }
     }
 

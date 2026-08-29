@@ -51,7 +51,9 @@ sealed interface MainAction {
     data object ImportClipboard : MainAction
     data object ImportConfigLocal : MainAction
     data class ImportManually(val type: Int) : MainAction
-    data class AddSubscription(val remarks: String, val url: String) : MainAction
+    data object AddSubscriptionFromClipboard : MainAction
+    data object AddSubscriptionFromQrCode : MainAction
+    data class AddSubscription(val url: String) : MainAction
     data object RestartService : MainAction
     data object LocateSelectedServer : MainAction
 

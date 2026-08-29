@@ -10,13 +10,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -27,7 +29,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Surface
@@ -38,7 +39,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,7 +46,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,7 +55,8 @@ import com.v2ray.ang.dto.GroupMapItem
 import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.ui.compose.AppTopBar
 import com.v2ray.ang.ui.compose.NavigationBarsSpacer
-import com.v2ray.ang.util.Utils
+import com.v2ray.ang.ui.compose.colorPing
+import com.v2ray.ang.ui.compose.colorPingRed
 
 @Composable
 fun SimpleMainScreen(
@@ -73,13 +73,14 @@ fun SimpleMainScreen(
     val servers by serversFlow.collectAsStateWithLifecycle()
     val selectedServer = servers.firstOrNull { it.guid == uiState.selectedGuid }
         ?: servers.firstOrNull()
+    val firstServerGuid = servers.firstOrNull()?.guid
+    val selectedGuidIsVisible = uiState.selectedGuid != null &&
+        servers.any { it.guid == uiState.selectedGuid }
     val statusText = mainViewModel.formatStatus(uiState.status)
-    var showAddDialog by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(servers, uiState.selectedGuid) {
-        val firstServer = servers.firstOrNull() ?: return@LaunchedEffect
-        if (servers.none { it.guid == uiState.selectedGuid }) {
-            onAction(MainAction.SelectServer(firstServer.guid))
+    LaunchedEffect(firstServerGuid, selectedGuidIsVisible) {
+        if (!selectedGuidIsVisible && firstServerGuid != null) {
+            onAction(MainAction.SelectServer(firstServerGuid))
         }
     }
 
@@ -128,7 +129,10 @@ fun SimpleMainScreen(
             Spacer(Modifier.height(28.dp))
 
             if (uiState.groups.isEmpty()) {
-                EmptySubscriptionPanel(onAdd = { showAddDialog = true })
+                EmptySubscriptionPanel(
+                    onClipboard = { onAction(MainAction.AddSubscriptionFromClipboard) },
+                    onQrCode = { onAction(MainAction.AddSubscriptionFromQrCode) }
+                )
             } else {
                 SubscriptionPanel(
                     groups = uiState.groups,
@@ -136,24 +140,17 @@ fun SimpleMainScreen(
                     servers = servers,
                     selectedServer = selectedServer,
                     isLoading = isLoading,
+                    isTesting = uiState.isTesting,
                     onSelectGroup = { onAction(MainAction.SelectGroup(it)) },
                     onSelectServer = { onAction(MainAction.SelectServer(it)) },
-                    onAdd = { showAddDialog = true },
+                    onClipboard = { onAction(MainAction.AddSubscriptionFromClipboard) },
+                    onQrCode = { onAction(MainAction.AddSubscriptionFromQrCode) },
+                    onPing = { onAction(MainAction.TestRealAllServers) },
                     onRefresh = { onAction(MainAction.UpdateSubscriptions) }
                 )
             }
             NavigationBarsSpacer(Modifier.height(24.dp))
         }
-    }
-
-    if (showAddDialog) {
-        AddSubscriptionDialog(
-            onDismiss = { showAddDialog = false },
-            onAdd = { remarks, url ->
-                showAddDialog = false
-                onAction(MainAction.AddSubscription(remarks, url))
-            }
-        )
     }
 }
 
@@ -238,7 +235,10 @@ private fun ConnectionPanel(
 }
 
 @Composable
-private fun EmptySubscriptionPanel(onAdd: () -> Unit) {
+private fun EmptySubscriptionPanel(
+    onClipboard: () -> Unit,
+    onQrCode: () -> Unit,
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -269,11 +269,11 @@ private fun EmptySubscriptionPanel(onAdd: () -> Unit) {
                 textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(18.dp))
-            Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
-                Icon(painterResource(R.drawable.ic_add_24dp), contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.simple_add_subscription))
-            }
+            AddSubscriptionButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClipboard = onClipboard,
+                onQrCode = onQrCode
+            )
         }
     }
 }
@@ -285,14 +285,18 @@ private fun SubscriptionPanel(
     servers: List<ServersCache>,
     selectedServer: ServersCache?,
     isLoading: Boolean,
+    isTesting: Boolean,
     onSelectGroup: (String) -> Unit,
     onSelectServer: (String) -> Unit,
-    onAdd: () -> Unit,
+    onClipboard: () -> Unit,
+    onQrCode: () -> Unit,
+    onPing: () -> Unit,
     onRefresh: () -> Unit,
 ) {
     val selectedGroup = groups.firstOrNull { it.id == selectedGroupId } ?: groups.first()
+    val selectedDelay = delayLabel(selectedServer?.testDelayMillis ?: 0L)
     var showGroups by remember { mutableStateOf(false) }
-    var showServers by remember { mutableStateOf(false) }
+    var showServerPicker by remember { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -321,7 +325,13 @@ private fun SubscriptionPanel(
                 ) {
                     groups.forEach { group ->
                         DropdownMenuItem(
-                            text = { Text(group.remarks, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            text = {
+                                Text(
+                                    group.remarks,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
                             onClick = {
                                 showGroups = false
                                 onSelectGroup(group.id)
@@ -333,35 +343,17 @@ private fun SubscriptionPanel(
 
             Spacer(Modifier.height(12.dp))
             if (servers.isNotEmpty()) {
-                Box {
-                    SelectorField(
-                        label = stringResource(R.string.simple_server),
-                        value = selectedServer?.profile?.remarks.orEmpty(),
-                        supportingText = stringResource(R.string.simple_servers_available, servers.size),
-                        enabled = servers.size > 1,
-                        onClick = { showServers = true }
-                    )
-                    DropdownMenu(
-                        expanded = showServers,
-                        onDismissRequest = { showServers = false }
-                    ) {
-                        servers.forEach { server ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = server.profile.remarks,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                onClick = {
-                                    showServers = false
-                                    onSelectServer(server.guid)
-                                }
-                            )
-                        }
-                    }
-                }
+                SelectorField(
+                    label = stringResource(R.string.simple_server),
+                    value = selectedServer?.profile?.remarks.orEmpty(),
+                    supportingText = stringResource(
+                        R.string.simple_server_summary,
+                        servers.size,
+                        selectedDelay
+                    ),
+                    enabled = true,
+                    onClick = { showServerPicker = true }
+                )
             } else {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -382,25 +374,158 @@ private fun SubscriptionPanel(
             Spacer(Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
-                    Icon(painterResource(R.drawable.ic_add_24dp), contentDescription = null)
+                AddSubscriptionButton(
+                    modifier = Modifier.weight(1f),
+                    onClipboard = onClipboard,
+                    onQrCode = onQrCode
+                )
+                FilledTonalButton(
+                    onClick = onPing,
+                    enabled = servers.isNotEmpty() && !isLoading && !isTesting,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (isTesting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_speed_24dp),
+                            contentDescription = null
+                        )
+                    }
                     Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.simple_add))
+                    Text(
+                        stringResource(
+                            if (isTesting) R.string.simple_testing else R.string.simple_ping
+                        ),
+                        maxLines = 1
+                    )
                 }
                 FilledTonalButton(
                     onClick = onRefresh,
-                    enabled = !isLoading,
+                    enabled = !isLoading && !isTesting,
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(painterResource(R.drawable.ic_restore_24dp), contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.simple_refresh))
+                    Text(stringResource(R.string.simple_refresh), maxLines = 1)
                 }
             }
         }
     }
+
+    if (showServerPicker) {
+        ServerPickerDialog(
+            servers = servers,
+            selectedGuid = selectedServer?.guid,
+            onSelect = { guid ->
+                showServerPicker = false
+                onSelectServer(guid)
+            },
+            onDismiss = { showServerPicker = false }
+        )
+    }
+}
+
+@Composable
+private fun AddSubscriptionButton(
+    modifier: Modifier = Modifier,
+    onClipboard: () -> Unit,
+    onQrCode: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier) {
+        Button(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(painterResource(R.drawable.ic_add_24dp), contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.simple_add), maxLines = 1)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.simple_clipboard)) },
+                leadingIcon = {
+                    Icon(painterResource(R.drawable.ic_copy), contentDescription = null)
+                },
+                onClick = {
+                    expanded = false
+                    onClipboard()
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.simple_qr_code)) },
+                leadingIcon = {
+                    Icon(painterResource(R.drawable.ic_scan_24dp), contentDescription = null)
+                },
+                onClick = {
+                    expanded = false
+                    onQrCode()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ServerPickerDialog(
+    servers: List<ServersCache>,
+    selectedGuid: String?,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.simple_server)) },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+            ) {
+                items(servers, key = { it.guid }) { server ->
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = server.profile.remarks,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontWeight = if (server.guid == selectedGuid) {
+                                        FontWeight.SemiBold
+                                    } else {
+                                        FontWeight.Normal
+                                    }
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                DelayText(server.testDelayMillis)
+                            }
+                        },
+                        onClick = { onSelect(server.guid) }
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
 }
 
 @Composable
@@ -458,74 +583,22 @@ private fun SelectorField(
 }
 
 @Composable
-private fun AddSubscriptionDialog(
-    onDismiss: () -> Unit,
-    onAdd: (String, String) -> Unit,
-) {
-    var remarks by rememberSaveable { mutableStateOf("") }
-    var url by rememberSaveable { mutableStateOf("") }
-    var showUrlError by rememberSaveable { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.simple_add_subscription)) },
-        text = {
-            Column {
-                Text(
-                    text = stringResource(R.string.simple_add_subscription_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = remarks,
-                    onValueChange = { remarks = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.simple_subscription_name)) },
-                    placeholder = { Text(stringResource(R.string.simple_subscription_name_optional)) },
-                    singleLine = true
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = {
-                        url = it
-                        showUrlError = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.simple_subscription_url)) },
-                    placeholder = { Text("https://example.com/sub") },
-                    supportingText = {
-                        Text(
-                            if (showUrlError) {
-                                stringResource(R.string.simple_subscription_url_required)
-                            } else {
-                                stringResource(R.string.simple_subscription_url_hint)
-                            }
-                        )
-                    },
-                    isError = showUrlError,
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
-                )
-            }
+private fun DelayText(delayMillis: Long) {
+    Text(
+        text = delayLabel(delayMillis),
+        style = MaterialTheme.typography.bodySmall,
+        color = when {
+            delayMillis > 0L -> colorPing
+            delayMillis < 0L -> colorPingRed
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
         },
-        confirmButton = {
-            TextButton(onClick = {
-                val cleanUrl = url.trim()
-                if (!Utils.isValidUrl(cleanUrl) || !Utils.isValidSubUrl(cleanUrl)) {
-                    showUrlError = true
-                } else {
-                    onAdd(remarks, cleanUrl)
-                }
-            }) {
-                Text(stringResource(R.string.simple_add_and_import))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        }
+        maxLines = 1
     )
+}
+
+@Composable
+private fun delayLabel(delayMillis: Long): String = when {
+    delayMillis > 0L -> stringResource(R.string.server_test_delay_value, delayMillis)
+    delayMillis < 0L -> stringResource(R.string.simple_ping_failed)
+    else -> stringResource(R.string.simple_not_tested)
 }
