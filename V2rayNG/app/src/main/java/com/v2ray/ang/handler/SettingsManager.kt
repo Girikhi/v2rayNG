@@ -402,17 +402,21 @@ object SettingsManager {
         return if (second) {
             AppConfig.DELAY_TEST_URL2
         } else {
-            MmkvManager.decodeSettingsString(AppConfig.PREF_DELAY_TEST_URL)
-                ?: AppConfig.DELAY_TEST_URL
+            when (val configuredUrl = MmkvManager.decodeSettingsString(AppConfig.PREF_DELAY_TEST_URL)) {
+                "https://www.gstatic.com/generate_204",
+                "https://www.google.com/generate_204",
+                null -> AppConfig.DELAY_TEST_URL
+                else -> configuredUrl
+            }
         }
     }
 
     /**
      * Get real ping concurrency.
-     * @return The number of concurrent real-ping tests (clamped to 1..64).
+     * @return The number of concurrent real-ping tests (clamped to 1..128).
      */
     fun getRealPingConcurrency(): Int {
-        val value = MmkvManager.decodeSettingsString(AppConfig.PREF_REAL_PING_CONCURRENCY)?.toIntOrNull() ?: 16
+        val value = MmkvManager.decodeSettingsString(AppConfig.PREF_REAL_PING_CONCURRENCY)?.toIntOrNull() ?: 32
         return value.coerceIn(1, 128)
     }
 
@@ -443,7 +447,7 @@ object SettingsManager {
      * Set night mode.
      */
     fun setNightMode() {
-        when (MmkvManager.decodeSettingsString(AppConfig.PREF_UI_MODE_NIGHT, "0")) {
+        when (MmkvManager.decodeSettingsString(AppConfig.PREF_UI_MODE_NIGHT, "1")) {
             "0" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
             "1" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
             "2" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
@@ -521,6 +525,7 @@ object SettingsManager {
         ensureDefaultValue(AppConfig.PREF_REMOTE_DNS, AppConfig.DNS_PROXY)
         ensureDefaultValue(AppConfig.PREF_DOMESTIC_DNS, AppConfig.DNS_DIRECT)
         ensureDefaultValue(AppConfig.PREF_DELAY_TEST_URL, AppConfig.DELAY_TEST_URL)
+        ensureDefaultValue(AppConfig.PREF_REAL_PING_CONCURRENCY, "32")
         ensureDefaultValue(AppConfig.PREF_IP_API_URL, AppConfig.IP_API_URL)
         ensureDefaultValue(AppConfig.PREF_HEV_TUNNEL_RW_TIMEOUT, AppConfig.HEVTUN_RW_TIMEOUT)
         ensureDefaultValue(AppConfig.PREF_MUX_CONCURRENCY, "8")

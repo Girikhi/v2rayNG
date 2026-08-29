@@ -8,12 +8,13 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.PopupMenu
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.isVisible
@@ -24,6 +25,8 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.databinding.ActivityMainBinding
+import com.v2ray.ang.dto.entities.SubscriptionCache
+import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.extension.toast
@@ -40,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.URI
 
 class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     private val binding by lazy {
@@ -68,7 +72,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
-        setupToolbar(binding.toolbar, false, getString(R.string.title_server))
+        setupToolbar(binding.toolbar, false, getString(R.string.app_name))
 
         // setup viewpager and tablayout
         groupPagerAdapter = GroupPagerAdapter(this, emptyList())
@@ -79,7 +83,9 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         setupNavigationDrawer()
 
         binding.fab.setOnClickListener { handleFabAction() }
-        binding.layoutTest.setOnClickListener { handleLayoutTestClick() }
+        binding.buttonAdd.setOnClickListener { showAddSubscriptionMenu(it) }
+        binding.buttonPing.setOnClickListener { mainViewModel.testAllRealPing() }
+        binding.buttonRefresh.setOnClickListener { importConfigViaSub() }
 
         setupGroupTab()
         setupViewModel()
@@ -120,6 +126,12 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         mainViewModel.isRunning.observe(this) { isRunning ->
             applyRunningState(false, isRunning)
         }
+        mainViewModel.isTesting.observe(this) { isTesting ->
+            binding.buttonPing.isEnabled = !isTesting
+            binding.buttonPing.text = getString(
+                if (isTesting) R.string.simple_testing else R.string.simple_ping
+            )
+        }
         mainViewModel.startListenBroadcast()
         mainViewModel.initAssets(assets)
     }
@@ -137,9 +149,12 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }.also { it.attach() }
 
         val targetIndex = groups.indexOfFirst { it.id == mainViewModel.subscriptionId }.takeIf { it >= 0 } ?: (groups.size - 1)
-        binding.viewPager.setCurrentItem(targetIndex, false)
+        if (targetIndex >= 0) {
+            binding.viewPager.setCurrentItem(targetIndex, false)
+        }
 
-        binding.tabGroup.isVisible = groups.size > 1
+        binding.tabGroup.isVisible = groups.isNotEmpty()
+        binding.subscriptionLabel.isVisible = groups.isNotEmpty()
         refreshGroupTabTitles(true)
     }
 
@@ -179,15 +194,6 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
     }
 
-    private fun handleLayoutTestClick() {
-        if (mainViewModel.isRunning.value == true) {
-            setTestState(getString(R.string.connection_test_testing))
-            mainViewModel.testCurrentServerRealPing()
-        } else {
-            // service not running: keep existing no-op (could show a message if desired)
-        }
-    }
-
     private fun startV2Ray() {
         if (MmkvManager.getSelectServer().isNullOrEmpty()) {
             toast(R.string.title_file_chooser)
@@ -210,6 +216,108 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         binding.tvTestState.text = content
     }
 
+    private fun showAddSubscriptionMenu(anchor: View) {
+        PopupMenu(this, anchor).apply {
+            menu.add(Menu.NONE, ADD_FROM_CLIPBOARD, Menu.NONE, R.string.simple_clipboard)
+                .setIcon(R.drawable.ic_copy)
+            menu.add(Menu.NONE, ADD_FROM_QR_CODE, Menu.NONE, R.string.simple_qr_code)
+                .setIcon(R.drawable.ic_scan_24dp)
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    ADD_FROM_CLIPBOARD -> addSubscriptionFromClipboard()
+                    ADD_FROM_QR_CODE -> addSubscriptionFromQrCode()
+                    else -> false
+                }
+            }
+            show()
+        }
+    }
+
+    private fun addSubscriptionFromClipboard(): Boolean {
+        return try {
+            val url = Utils.getClipboard(this).trim()
+            if (url.isEmpty()) {
+                toast(R.string.toast_none_data_clipboard)
+                false
+            } else {
+                addSubscription(url)
+                true
+            }
+        } catch (error: Exception) {
+            LogUtil.e(AppConfig.TAG, "Failed to read subscription from clipboard", error)
+            toastError(R.string.toast_failure)
+            false
+        }
+    }
+
+    private fun addSubscriptionFromQrCode(): Boolean {
+        launchQRCodeScanner { scanResult ->
+            scanResult?.trim()?.takeIf { it.isNotEmpty() }?.let(::addSubscription)
+        }
+        return true
+    }
+
+    private fun addSubscription(url: String) {
+        val cleanUrl = url.trim()
+        if (!Utils.isValidUrl(cleanUrl)) {
+            toast(R.string.toast_invalid_url)
+            return
+        }
+        if (!Utils.isValidSubUrl(cleanUrl)) {
+            toast(R.string.toast_insecure_url_protocol)
+            return
+        }
+        if (MmkvManager.decodeSubscriptions().any {
+                it.subscription.url.trim().equals(cleanUrl, ignoreCase = true)
+            }
+        ) {
+            toast(R.string.simple_subscription_exists)
+            return
+        }
+
+        val remarks = runCatching { URI(cleanUrl).host }
+            .getOrNull()
+            ?.removePrefix("www.")
+            .orEmpty()
+            .ifEmpty { getString(R.string.simple_default_subscription_name) }
+        val subscription = SubscriptionItem(remarks = remarks, url = cleanUrl)
+        val subscriptionId = Utils.getUuid()
+        MmkvManager.encodeSubscription(subscriptionId, subscription)
+        mainViewModel.subscriptionIdChanged(subscriptionId)
+        showLoading()
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                AngConfigManager.updateConfigViaSub(
+                    SubscriptionCache(subscriptionId, subscription)
+                )
+            }
+            withContext(Dispatchers.Main) {
+                result.onSuccess { updateResult ->
+                    setupGroupTab()
+                    mainViewModel.reloadServerList()
+                    refreshGroupTabTitles()
+                    SubscriptionUpdater.sync()
+                    if (updateResult.successCount > 0) {
+                        toast(
+                            getString(
+                                R.string.title_update_config_count,
+                                updateResult.configCount
+                            )
+                        )
+                    } else {
+                        toastError(R.string.simple_subscription_update_failed)
+                    }
+                }.onFailure { error ->
+                    LogUtil.e(AppConfig.TAG, "Failed to add subscription", error)
+                    setupGroupTab()
+                    toastError(R.string.simple_subscription_update_failed)
+                }
+                hideLoading()
+            }
+        }
+    }
+
     private fun applyRunningState(isLoading: Boolean, isRunning: Boolean) {
         if (isLoading) {
             binding.fab.setImageResource(R.drawable.ic_fab_check)
@@ -218,16 +326,18 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
         if (isRunning) {
             binding.fab.setImageResource(R.drawable.ic_stop_24dp)
-            binding.fab.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.color_fab_active))
+            binding.fab.backgroundTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.md_theme_tertiary)
+            )
             binding.fab.contentDescription = getString(R.string.action_stop_service)
-            setTestState(getString(R.string.connection_connected))
-            binding.layoutTest.isFocusable = true
+            setTestState(getString(R.string.simple_connected))
         } else {
             binding.fab.setImageResource(R.drawable.ic_play_24dp)
-            binding.fab.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.color_fab_inactive))
+            binding.fab.backgroundTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.md_theme_primary)
+            )
             binding.fab.contentDescription = getString(R.string.tasker_start_service)
-            setTestState(getString(R.string.connection_not_connected))
-            binding.layoutTest.isFocusable = false
+            setTestState(getString(R.string.simple_tap_to_connect))
         }
     }
 
@@ -240,26 +350,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_main, menu)
-
-        val searchItem = menu.findItem(R.id.search_view)
-        if (searchItem != null) {
-            val searchView = searchItem.actionView as SearchView
-            searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-                override fun onQueryTextSubmit(query: String?): Boolean = false
-
-                override fun onQueryTextChange(newText: String?): Boolean {
-                    mainViewModel.filterConfig(newText.orEmpty())
-                    return false
-                }
-            })
-
-            searchView.setOnCloseListener {
-                mainViewModel.filterConfig("")
-                false
-            }
-        }
-        return super.onCreateOptionsMenu(menu)
+        return false
     }
 
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
@@ -686,5 +777,10 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     override fun onDestroy() {
         tabMediator?.detach()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val ADD_FROM_CLIPBOARD = 1
+        private const val ADD_FROM_QR_CODE = 2
     }
 }

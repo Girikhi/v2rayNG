@@ -67,12 +67,7 @@ class GroupServerFragment : BaseFragment<FragmentGroupServerBinding>(),
 
         adapter = MainRecyclerAdapter(mainViewModel, ActivityAdapterListener())
         binding.recyclerView.setHasFixedSize(true)
-        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_DOUBLE_COLUMN_DISPLAY, false)) {
-            binding.recyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
-        } else {
-            binding.recyclerView.layoutManager = GridLayoutManager(requireContext(), 1)
-        }
-        addCustomDividerToRecyclerView(binding.recyclerView, R.drawable.custom_divider)
+        binding.recyclerView.layoutManager = GridLayoutManager(requireContext(), 1)
         binding.recyclerView.adapter = adapter
 
         itemTouchHelper = ItemTouchHelper(SimpleItemTouchHelperCallback(adapter, allowSwipe = false))

@@ -301,7 +301,7 @@
         <EditTextPreference
             android:inputType="number"
             android:key="pref_real_ping_concurrency"
-            android:summary="16"
+            android:summary="32"
             android:title="@string/title_pref_real_ping_concurrency" />
 
         <EditTextPreference

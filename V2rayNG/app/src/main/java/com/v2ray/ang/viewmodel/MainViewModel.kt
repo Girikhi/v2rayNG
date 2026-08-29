@@ -39,7 +39,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var subscriptionId: String = MmkvManager.decodeSettingsString(AppConfig.CACHE_SUBSCRIPTION_ID, "").orEmpty()
     var keywordFilter = ""
     val serversCache = mutableListOf<ServersCache>()
+    private val serverPositions = mutableMapOf<String, Int>()
     val isRunning by lazy { MutableLiveData<Boolean>() }
+    val isTesting by lazy { MutableLiveData<Boolean>(false) }
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
 
@@ -88,6 +90,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (index >= 0) {
             serversCache.removeAt(index)
         }
+        rebuildServerPositions()
     }
 
     /**
@@ -102,6 +105,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         Collections.swap(serverList, fromPosition, toPosition)
         Collections.swap(serversCache, fromPosition, toPosition)
+        rebuildServerPositions()
 
         MmkvManager.encodeServerList(serverList, subscriptionId)
     }
@@ -137,6 +141,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 serversCache.add(ServersCache(guid, profile))
             }
         }
+        rebuildServerPositions()
     }
 
     /**
@@ -184,8 +189,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch(Dispatchers.Default) {
             if (serversCache.isEmpty()) {
+                isTesting.postValue(false)
                 return@launch
             }
+            isTesting.postValue(true)
             MessageUtil.sendMsg2TestService(
                 getApplication(),
                 TestServiceMessage(
@@ -255,11 +262,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * @return The position of the server.
      */
     fun getPosition(guid: String): Int {
-        serversCache.forEachIndexed { index, it ->
-            if (it.guid == guid)
-                return index
+        return serverPositions[guid] ?: -1
+    }
+
+    private fun rebuildServerPositions() {
+        serverPositions.clear()
+        serversCache.forEachIndexed { index, server ->
+            serverPositions[server.guid] = index
         }
-        return -1
     }
 
     /**
@@ -415,6 +425,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             withContext(Dispatchers.Main) {
                 reloadServerList()
+                isTesting.value = false
             }
         }
     }
@@ -458,16 +469,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     updateListAction.value = getPosition(content ?: "")
                 }
 
-                AppConfig.MSG_MEASURE_CONFIG_NOTIFY -> {
-                    val content = intent.getStringExtra("content")
-                    updateTestResultAction.value =
-                        getApplication<AngApplication>().getString(R.string.connection_runing_task_left, content)
-                }
+                AppConfig.MSG_MEASURE_CONFIG_NOTIFY -> Unit
 
                 AppConfig.MSG_MEASURE_CONFIG_FINISH -> {
                     val content = intent.getStringExtra("content")
                     if (content == "0") {
                         onTestsFinished()
+                    } else {
+                        isTesting.value = false
                     }
                 }
             }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">v2rayNG</string>
+    <string name="app_name" translatable="false">v2rayNg Auto</string>
     <string name="app_widget_name">Switch</string>
     <string name="app_tile_name">Switch</string>
     <string name="app_tile_first_use">First use of this feature, please use the app to add server</string>
@@ -314,6 +314,22 @@
     <string name="sub_setting_pre_profile_tip">The config remarks exist and are unique</string>
     <string name="toast_invalid_update_interval">Invalid update interval. Minimum is 15 minutes.</string>
     <string name="title_sub_update">Update subscription</string>
+    <string name="simple_add">Add</string>
+    <string name="simple_clipboard">Clipboard</string>
+    <string name="simple_qr_code">QR code</string>
+    <string name="simple_ping">Ping</string>
+    <string name="simple_testing">Testing…</string>
+    <string name="simple_refresh">Refresh</string>
+    <string name="simple_subscription">Subscription</string>
+    <string name="simple_servers">Servers</string>
+    <string name="simple_tap_to_connect">Tap to connect</string>
+    <string name="simple_connected">Connected</string>
+    <string name="simple_not_tested">Not tested</string>
+    <string name="simple_ping_failed">Failed</string>
+    <string name="simple_default_subscription_name">Subscription</string>
+    <string name="simple_subscription_exists">This subscription has already been added.</string>
+    <string name="simple_subscription_update_failed">Subscription saved, but profiles could not be downloaded.</string>
+    <string name="server_test_delay_value">%1$d ms</string>
     <string name="title_real_ping_all_server">Real delay config</string>
     <string name="title_user_asset_setting">Asset files</string>
     <string name="title_sort_by_test_results">Sorting by test results</string>
