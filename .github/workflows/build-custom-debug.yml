@@ -75,10 +75,10 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleFdroidDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload universal APK
         uses: actions/upload-artifact@v7
         with:
-          name: v2rayNG-custom-debug
-          path: V2rayNG/app/build/outputs/apk/fdroid/debug/*.apk
+          name: v2rayNG-universal-debug
+          path: V2rayNG/app/build/outputs/apk/fdroid/debug/*_universal.apk
           if-no-files-found: error
           retention-days: 14
