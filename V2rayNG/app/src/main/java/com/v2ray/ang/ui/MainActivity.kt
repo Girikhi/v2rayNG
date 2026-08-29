@@ -10,16 +10,12 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.PopupMenu
-import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
-import androidx.core.view.GravityCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.navigation.NavigationView
 import com.google.android.material.tabs.TabLayoutMediator
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
@@ -45,7 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
 
-class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelectedListener {
+class MainActivity : HelperBaseActivity() {
     private val binding by lazy {
         ActivityMainBinding.inflate(layoutInflater)
     }
@@ -72,15 +68,12 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
-        setupToolbar(binding.toolbar, false, getString(R.string.app_name))
+        setupTopBar()
 
         // setup viewpager and tablayout
         groupPagerAdapter = GroupPagerAdapter(this, emptyList())
         binding.viewPager.adapter = groupPagerAdapter
         binding.viewPager.isUserInputEnabled = true
-
-        // setup navigation drawer
-        setupNavigationDrawer()
 
         binding.fab.setOnClickListener { handleFabAction() }
         binding.buttonAdd.setOnClickListener { showAddSubscriptionMenu(it) }
@@ -96,29 +89,20 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
     }
 
-    private fun setupNavigationDrawer() {
-        val toggle = ActionBarDrawerToggle(
-            this,
-            binding.drawerLayout,
-            binding.toolbar,
-            R.string.navigation_drawer_open,
-            R.string.navigation_drawer_close
-        )
-        binding.drawerLayout.addDrawerListener(toggle)
-        toggle.syncState()
-        binding.navView.setNavigationItemSelectedListener(this)
-
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                    binding.drawerLayout.closeDrawer(GravityCompat.START)
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
-                    isEnabled = true
-                }
+    private fun setupTopBar() {
+        binding.toolbar.navigationContentDescription = getString(R.string.title_sub_setting)
+        binding.toolbar.setNavigationOnClickListener {
+            requestActivityLauncher.launch(Intent(this, SubSettingActivity::class.java))
+        }
+        binding.toolbar.inflateMenu(R.menu.menu_simple_main)
+        binding.toolbar.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.simple_settings) {
+                requestActivityLauncher.launch(Intent(this, SettingsActivity::class.java))
+                true
+            } else {
+                false
             }
-        })
+        }
     }
 
     private fun setupViewModel() {
@@ -754,25 +738,6 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         return super.onKeyDown(keyCode, event)
     }
 
-
-    override fun onNavigationItemSelected(item: MenuItem): Boolean {
-        // Handle navigation view item clicks here.
-        when (item.itemId) {
-            R.id.sub_setting -> requestActivityLauncher.launch(Intent(this, SubSettingActivity::class.java))
-            R.id.per_app_proxy_settings -> requestActivityLauncher.launch(Intent(this, PerAppProxyActivity::class.java))
-            R.id.routing_setting -> requestActivityLauncher.launch(Intent(this, RoutingSettingActivity::class.java))
-            R.id.user_asset_setting -> requestActivityLauncher.launch(Intent(this, UserAssetActivity::class.java))
-            R.id.settings -> requestActivityLauncher.launch(Intent(this, SettingsActivity::class.java))
-            R.id.promotion -> Utils.openUri(this, "${Utils.decode(AppConfig.APP_PROMOTION_URL)}?t=${System.currentTimeMillis()}")
-            R.id.logcat -> startActivity(Intent(this, LogcatActivity::class.java))
-            R.id.check_for_update -> startActivity(Intent(this, CheckUpdateActivity::class.java))
-            R.id.backup_restore -> requestActivityLauncher.launch(Intent(this, BackupActivity::class.java))
-            R.id.about -> startActivity(Intent(this, AboutActivity::class.java))
-        }
-
-        binding.drawerLayout.closeDrawer(GravityCompat.START)
-        return true
-    }
 
     override fun onDestroy() {
         tabMediator?.detach()

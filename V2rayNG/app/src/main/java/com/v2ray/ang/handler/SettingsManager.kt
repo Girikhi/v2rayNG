@@ -22,6 +22,7 @@ import com.v2ray.ang.enums.RoutingType
 import com.v2ray.ang.enums.VpnInterfaceAddressConfig
 import com.v2ray.ang.handler.MmkvManager.decodeAllServerList
 import com.v2ray.ang.handler.MmkvManager.decodeServerConfig
+import com.v2ray.ang.handler.MmkvManager.decodeServerList
 import com.v2ray.ang.handler.MmkvManager.decodeSubsList
 import com.v2ray.ang.handler.MmkvManager.decodeSubscription
 import com.v2ray.ang.handler.MmkvManager.encodeSubscription
@@ -45,6 +46,7 @@ object SettingsManager {
         //ensureDefaultSubscription()
         initRoutingRulesets(context)
         migrateServerListToSubscriptions()
+        removeEmptyDefaultSubscription()
         migrateHysteria2PinSHA256()
     }
 
@@ -262,24 +264,10 @@ object SettingsManager {
 
     /**
      * Removes the subscription.
-     * If there are no remaining subscriptions,
-     * it creates a new default subscription to ensure that ungroup
      **/
     fun removeSubscriptionWithDefault(subid: String) {
         SubscriptionUpdater.cancelOne(subId = subid)
-        // Remove the subscription
         removeSubscription(subid)
-
-        // After removal, check if there are any subscriptions left. If not, create a default subscription.
-        val subsList2 = decodeSubsList()
-        if (subsList2.isNotEmpty()) {
-            return
-        }
-
-        val defaultSub = SubscriptionItem(
-            remarks = "Default",
-        )
-        encodeSubscription(DEFAULT_SUBSCRIPTION_ID, defaultSub)
     }
 
     /**
@@ -579,9 +567,6 @@ object SettingsManager {
             return
         }
 
-        // Ensure default subscription exists before migration
-        ensureDefaultSubscription()
-
         // Read existing server list from legacy KEY_ANG_CONFIGS
         val oldJson = MmkvManager.readLegacyServerList()
         if (oldJson.isNullOrBlank()) {
@@ -594,6 +579,9 @@ object SettingsManager {
             MmkvManager.encodeSettings(migrationKey, true)
             return
         }
+
+        // The internal group is needed only when there are legacy ungrouped servers.
+        ensureDefaultSubscription()
 
         val subscriptionServerMap = mutableMapOf<String, MutableList<String>>()
 
@@ -632,6 +620,15 @@ object SettingsManager {
             if (subsList.count() > 1) {
                 swapSubscriptions(0, subsList.count() - 1)
             }
+        }
+    }
+
+    /** Removes the empty internal group created by older versions. */
+    private fun removeEmptyDefaultSubscription() {
+        if (decodeSubscription(DEFAULT_SUBSCRIPTION_ID) != null &&
+            decodeServerList(DEFAULT_SUBSCRIPTION_ID).isEmpty()
+        ) {
+            removeSubscription(DEFAULT_SUBSCRIPTION_ID)
         }
     }
 
