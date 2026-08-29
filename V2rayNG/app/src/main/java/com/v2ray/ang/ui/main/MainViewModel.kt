@@ -25,6 +25,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import com.v2ray.ang.extension.delay
 import kotlinx.coroutines.ensureActive
@@ -72,9 +73,11 @@ class MainViewModel(
     private val serverOrderPersistenceJobs = mutableMapOf<String, Job>()
 
     private var setupGroupJob: Job? = null
-    private var preloadJob: Job? = null
     private var selectedGroupLoadJob: Job? = null
     private var reloadJob: Job? = null
+
+    private data class MeasuredDelayUpdate(val groupId: String, val guid: String)
+    private val measuredDelayUpdates = Channel<MeasuredDelayUpdate>(Channel.UNLIMITED)
 
     @Volatile
     private var testingGroupId: String? = null
@@ -84,6 +87,7 @@ class MainViewModel(
     // ---------- Service events ----------
     init {
         collectServiceEvents()
+        collectMeasuredDelayUpdates()
         setupGroupTab()
     }
 
@@ -116,9 +120,9 @@ class MainViewModel(
 
             is MainServiceEvent.MeasureConfigSuccess -> updateMeasuredDelay(event.guid)
 
-            is MainServiceEvent.MeasureConfigNotify -> {
-                _uiState.update { it.copy(status = MainStatus.TestProgress(event.progress)) }
-            }
+            // The simple screen shows per-server delays and a testing indicator. Updating hidden
+            // progress text for every result only forces expensive whole-screen recompositions.
+            is MainServiceEvent.MeasureConfigNotify -> Unit
 
             is MainServiceEvent.MeasureConfigFinish -> {
                 onTestsFinished()
@@ -306,21 +310,8 @@ class MainViewModel(
         return resolved
     }
 
-    private fun radialPreloadOrder(groups: List<GroupMapItem>, selectedIndex: Int): List<String> {
-        if (groups.isEmpty()) return emptyList()
-        val result = ArrayList<String>((groups.size - 1).coerceAtLeast(0))
-        for (distance in 1 until groups.size) {
-            val right = selectedIndex + distance
-            val left = selectedIndex - distance
-            if (right in groups.indices) result += groups[right].id
-            if (left in groups.indices) result += groups[left].id
-        }
-        return result
-    }
-
     fun setupGroupTab(forceRefresh: Boolean = false): Job {
         setupGroupJob?.cancel()
-        preloadJob?.cancel()
         selectedGroupLoadJob?.cancel()
 
         return viewModelScope.launch(ioDispatcher) {
@@ -355,18 +346,6 @@ class MainViewModel(
 
                 if (!initialPageReady.isCompleted) {
                     initialPageReady.complete(Unit)
-                }
-
-                val selectedIndex =
-                    groups.indexOfFirst { it.id == selectedGroup }.coerceAtLeast(0)
-                val preloadOrder = radialPreloadOrder(groups, selectedIndex)
-                preloadJob = viewModelScope.launch(preloadDispatcher) {
-                    preloadOrder.forEach { groupId ->
-                        ensureActive()
-                        delay(32)
-                        val servers = loadGroup(groupId, forceRefresh)
-                        updateGroupUi(groupId, servers)
-                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -727,18 +706,61 @@ class MainViewModel(
     // ---------- Testing ----------
     private fun updateMeasuredDelay(guid: String) {
         if (guid.isBlank()) return
+        measuredDelayUpdates.trySend(
+            MeasuredDelayUpdate(
+                groupId = testingGroupId ?: uiState.value.selectedGroupId,
+                guid = guid,
+            )
+        )
+    }
+
+    private fun collectMeasuredDelayUpdates() {
         viewModelScope.launch(ioDispatcher) {
-            val delayMillis = dataSource.decodeAffiliationInfo(guid)?.testDelayMillis
-                ?: return@launch
-            val groupId = testingGroupId ?: uiState.value.selectedGroupId
-            val updateServer: (ServersCache) -> ServersCache = { server ->
-                if (server.guid == guid) server.copy(testDelayMillis = delayMillis) else server
-            }
-            mutableServersForGroup(groupId).update { servers -> servers.map(updateServer) }
-            cacheMutex.withLock {
-                groupDataCache[groupId]?.let { cached ->
-                    groupDataCache[groupId] = cached.map(updateServer)
+            for (firstUpdate in measuredDelayUpdates) {
+                val batches = linkedMapOf<String, MutableSet<String>>()
+
+                fun addToBatch(update: MeasuredDelayUpdate) {
+                    batches.getOrPut(update.groupId) { linkedSetOf() }.add(update.guid)
                 }
+
+                addToBatch(firstUpdate)
+                delay(80)
+                while (true) {
+                    val update = measuredDelayUpdates.tryReceive().getOrNull() ?: break
+                    addToBatch(update)
+                }
+
+                batches.forEach { (groupId, guids) ->
+                    applyMeasuredDelayBatch(groupId, guids)
+                }
+            }
+        }
+    }
+
+    private suspend fun applyMeasuredDelayBatch(groupId: String, guids: Set<String>) {
+        val delays = guids.mapNotNull { guid ->
+            dataSource.decodeAffiliationInfo(guid)?.testDelayMillis?.let { guid to it }
+        }.toMap()
+        if (delays.isEmpty()) return
+
+        val updateServers: (List<ServersCache>) -> List<ServersCache> = { servers ->
+            var changed = false
+            val updated = servers.map { server ->
+                val delayMillis = delays[server.guid]
+                if (delayMillis != null && delayMillis != server.testDelayMillis) {
+                    changed = true
+                    server.copy(testDelayMillis = delayMillis)
+                } else {
+                    server
+                }
+            }
+            if (changed) updated else servers
+        }
+
+        mutableServersForGroup(groupId).update(updateServers)
+        cacheMutex.withLock {
+            groupDataCache[groupId]?.let { cached ->
+                groupDataCache[groupId] = updateServers(cached)
             }
         }
     }
@@ -855,10 +877,10 @@ class MainViewModel(
 
     override fun onCleared() {
         setupGroupJob?.cancel()
-        preloadJob?.cancel()
         selectedGroupLoadJob?.cancel()
         reloadJob?.cancel()
         filterJob?.cancel()
+        measuredDelayUpdates.close()
         cancelAllPing()
         dataSource.close()
         super.onCleared()

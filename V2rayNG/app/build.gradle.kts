@@ -9,6 +9,18 @@ android {
     namespace = "com.v2ray.ang"
     compileSdk = 37
 
+    val githubKeystorePath = System.getenv("ANDROID_KEYSTORE_FILE")
+    val githubSigningConfig = if (!githubKeystorePath.isNullOrBlank()) {
+        signingConfigs.create("githubActions") {
+            storeFile = file(githubKeystorePath)
+            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+        }
+    } else {
+        null
+    }
+
     defaultConfig {
         applicationId = "com.v2ray.ang"
         minSdk = 24
@@ -39,6 +51,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Keep the APK installable while allowing ART to optimize it like a normal app.
+            isDebuggable = false
+            githubSigningConfig?.let { signingConfig = it }
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -92,7 +109,7 @@ android {
                 .map { it as com.android.build.gradle.internal.api.ApkVariantOutputImpl }
                 .forEach { output ->
                     val abi = output.getFilter("ABI") ?: "universal"
-                    output.outputFileName = "v2rayNG_${variant.versionName}-fdroid_${abi}.apk"
+                    output.outputFileName = "v2rayNg_Auto_${variant.versionName}-fdroid_${abi}.apk"
                     if (versionCodes.containsKey(abi)) {
                         output.versionCodeOverride =
                             (100 * variant.versionCode + versionCodes[abi]!!).plus(5000000)
@@ -112,7 +129,7 @@ android {
                     else
                         "universal"
 
-                    output.outputFileName = "v2rayNG_${variant.versionName}_${abi}.apk"
+                    output.outputFileName = "v2rayNg_Auto_${variant.versionName}_${abi}.apk"
                     if (versionCodes.containsKey(abi)) {
                         output.versionCodeOverride =
                             (1000000 * versionCodes[abi]!!).plus(variant.versionCode)

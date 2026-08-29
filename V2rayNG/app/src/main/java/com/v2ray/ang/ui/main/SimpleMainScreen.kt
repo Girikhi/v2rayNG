@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,10 +51,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.v2ray.ang.R
-import com.v2ray.ang.dto.GroupMapItem
-import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.ui.compose.AppTopBar
 import com.v2ray.ang.ui.compose.NavigationBarsSpacer
+
+@Immutable
+private data class SimpleGroupItem(
+    val id: String,
+    val remarks: String,
+)
+
+@Immutable
+private data class SimpleServerItem(
+    val guid: String,
+    val name: String,
+    val delayMillis: Long,
+)
 
 private val SimpleLightColorScheme = lightColorScheme(
     primary = Color(0xFF536D7A),
@@ -98,11 +110,23 @@ fun SimpleMainScreen(
         mainViewModel.serversForGroup(uiState.selectedGroupId)
     }
     val servers by serversFlow.collectAsStateWithLifecycle()
-    val selectedServer = servers.firstOrNull { it.guid == uiState.selectedGuid }
-        ?: servers.firstOrNull()
-    val firstServerGuid = servers.firstOrNull()?.guid
+    val groupItems = remember(uiState.groups) {
+        uiState.groups.map { SimpleGroupItem(id = it.id, remarks = it.remarks) }
+    }
+    val serverItems = remember(servers) {
+        servers.map {
+            SimpleServerItem(
+                guid = it.guid,
+                name = it.profile.remarks,
+                delayMillis = it.testDelayMillis,
+            )
+        }
+    }
+    val selectedServer = serverItems.firstOrNull { it.guid == uiState.selectedGuid }
+        ?: serverItems.firstOrNull()
+    val firstServerGuid = serverItems.firstOrNull()?.guid
     val selectedGuidIsVisible = uiState.selectedGuid != null &&
-        servers.any { it.guid == uiState.selectedGuid }
+        serverItems.any { it.guid == uiState.selectedGuid }
     val statusText = mainViewModel.formatStatus(uiState.status)
 
     LaunchedEffect(firstServerGuid, selectedGuidIsVisible) {
@@ -163,14 +187,14 @@ fun SimpleMainScreen(
                         isLoading = isLoading,
                         canConnect = uiState.isRunning || selectedServer != null,
                         statusText = statusText,
-                        serverName = selectedServer?.profile?.remarks,
+                        serverName = selectedServer?.name,
                         onToggle = { onAction(MainAction.ToggleService) }
                     )
                 }
                 item {
                     QuickActionsRow(
-                        hasServers = servers.isNotEmpty(),
-                        hasSubscriptions = uiState.groups.isNotEmpty(),
+                        hasServers = serverItems.isNotEmpty(),
+                        hasSubscriptions = groupItems.isNotEmpty(),
                         isLoading = isLoading,
                         isTesting = uiState.isTesting,
                         onClipboard = {
@@ -182,27 +206,27 @@ fun SimpleMainScreen(
                     )
                 }
 
-                if (uiState.groups.isEmpty()) {
+                if (groupItems.isEmpty()) {
                     item { EmptySubscriptionPanel() }
                 } else {
                     item {
                         SubscriptionPanel(
-                            groups = uiState.groups,
+                            groups = groupItems,
                             selectedGroupId = uiState.selectedGroupId,
                             onSelectGroup = { onAction(MainAction.SelectGroup(it)) },
                         )
                     }
 
-                    if (servers.isEmpty()) {
+                    if (serverItems.isEmpty()) {
                         item { EmptyServersPanel() }
                     } else {
                         item {
                             ServerSectionHeader(
-                                serverCount = servers.size,
+                                serverCount = serverItems.size,
                                 isTesting = uiState.isTesting,
                             )
                         }
-                        items(servers, key = { it.guid }) { server ->
+                        items(serverItems, key = { it.guid }) { server ->
                             ServerRow(
                                 server = server,
                                 selected = server.guid == selectedServer?.guid,
@@ -401,7 +425,7 @@ private fun EmptySubscriptionPanel() {
 
 @Composable
 private fun SubscriptionPanel(
-    groups: List<GroupMapItem>,
+    groups: List<SimpleGroupItem>,
     selectedGroupId: String,
     onSelectGroup: (String) -> Unit,
 ) {
@@ -507,7 +531,7 @@ private fun ServerSectionHeader(
 
 @Composable
 private fun ServerRow(
-    server: ServersCache,
+    server: SimpleServerItem,
     selected: Boolean,
     onSelect: () -> Unit,
 ) {
@@ -539,7 +563,7 @@ private fun ServerRow(
             RadioButton(selected = selected, onClick = null)
             Spacer(Modifier.width(6.dp))
             Text(
-                text = server.profile.remarks,
+                text = server.name,
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
@@ -547,7 +571,7 @@ private fun ServerRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.width(12.dp))
-            DelayText(server.testDelayMillis)
+            DelayText(server.delayMillis)
         }
     }
 }

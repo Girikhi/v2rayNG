@@ -1,4 +1,4 @@
-name: Build Custom Debug APK
+name: Build v2rayNg Auto APK
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build installable APK
+    name: Build optimized installable APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -49,6 +49,14 @@ jobs:
           cmdline-tools-version: "14742923"
           packages: "platforms;android-37.0 build-tools;37.0.0 platform-tools ndk;29.0.14206865"
 
+      - name: Prepare stable APK signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.V2RAYNG_AUTO_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/v2rayng-auto.p12"
+          chmod 600 "$RUNNER_TEMP/v2rayng-auto.p12"
+
       - name: Build native tunnel libraries
         run: |
           export NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
@@ -68,17 +76,33 @@ jobs:
             --pattern libv2ray.aar \
             --dir V2rayNG/app/libs
 
-      - name: Build F-Droid debug APK
+      - name: Build optimized F-Droid APK
         working-directory: V2rayNG
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/v2rayng-auto.p12
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.V2RAYNG_AUTO_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: v2rayng-auto
+          ANDROID_KEY_PASSWORD: ${{ secrets.V2RAYNG_AUTO_KEYSTORE_PASSWORD }}
         run: |
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
           chmod +x gradlew
           ./gradlew assembleFdroidDebug --no-daemon --stacktrace
 
+      - name: Verify universal APK
+        run: |
+          apk_path="$(find V2rayNG/app/build/outputs/apk/fdroid/debug -name '*_universal.apk' -print -quit)"
+          test -n "$apk_path"
+          badging="$($ANDROID_HOME/build-tools/37.0.0/aapt2 dump badging "$apk_path")"
+          printf '%s\n' "$badging" | grep -F "application-label:'v2rayNg Auto'"
+          if printf '%s\n' "$badging" | grep -q "application-debuggable"; then
+            echo "APK must not be debuggable" >&2
+            exit 1
+          fi
+
       - name: Upload universal APK
         uses: actions/upload-artifact@v7
         with:
-          name: v2rayNG-universal-debug
+          name: v2rayNg-Auto-universal
           path: V2rayNG/app/build/outputs/apk/fdroid/debug/*_universal.apk
           if-no-files-found: error
           retention-days: 14
