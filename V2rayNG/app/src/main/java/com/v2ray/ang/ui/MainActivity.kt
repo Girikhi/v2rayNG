@@ -955,7 +955,6 @@ class MainActivity : HelperBaseActivity() {
 
     override fun onDestroy() {
         binding.viewPager.unregisterOnPageChangeCallback(pageChangeCallback)
-        tabMediator?.detach()
         super.onDestroy()
     }
 
