@@ -64,7 +64,7 @@ class MainActivity : HelperBaseActivity() {
             }
             accountDashboardAdapter.selectAccount(accountId)
             binding.accountRecycler.smoothScrollToPosition(position)
-            showSelectedServerCount(accountId)
+            showSelectedAccount(accountId)
         }
     }
 
@@ -101,7 +101,7 @@ class MainActivity : HelperBaseActivity() {
                     if (mainViewModel.subscriptionId != accountId) {
                         mainViewModel.subscriptionIdChanged(accountId)
                     }
-                    showSelectedServerCount(accountId)
+                    showSelectedAccount(accountId)
                 } else {
                     binding.viewPager.setCurrentItem(position, true)
                 }
@@ -131,18 +131,12 @@ class MainActivity : HelperBaseActivity() {
     }
 
     private fun setupTopBar() {
-        binding.toolbar.navigationContentDescription = getString(R.string.title_account_setting)
-        binding.toolbar.setNavigationOnClickListener {
+        binding.headerAccountsAction.contentDescription = getString(R.string.title_account_setting)
+        binding.headerAccountsAction.setOnClickListener {
             requestActivityLauncher.launch(Intent(this, SubSettingActivity::class.java))
         }
-        binding.toolbar.inflateMenu(R.menu.menu_simple_main)
-        binding.toolbar.setOnMenuItemClickListener { item ->
-            if (item.itemId == R.id.simple_settings) {
-                requestActivityLauncher.launch(Intent(this, SettingsActivity::class.java))
-                true
-            } else {
-                false
-            }
+        binding.buttonSettings.setOnClickListener {
+            requestActivityLauncher.launch(Intent(this, SettingsActivity::class.java))
         }
     }
 
@@ -196,33 +190,17 @@ class MainActivity : HelperBaseActivity() {
         subscription: SubscriptionItem,
     ): AccountDashboardItem {
         val metadata = subscription.panelMetadata
-        val rawStatus = metadata?.status?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
-        val status = when (rawStatus) {
-            "active" -> getString(R.string.simple_status_active)
-            "scheduled" -> getString(R.string.simple_status_scheduled)
-            "disabled" -> getString(R.string.simple_status_disabled)
-            "expired" -> getString(R.string.simple_status_expired)
-            null -> getString(R.string.simple_status_not_synced)
-            else -> getString(R.string.simple_status_unknown)
-        }
-        val startDate = metadata?.startsOn
-            ?.takeIf { it.isNotBlank() }
-            ?.let(::displayDateValue)
-            ?: getString(R.string.simple_value_unavailable)
-        val expiryDate = metadata?.let(::displayExpiryDate)
-            ?: getString(R.string.simple_value_unavailable)
-        val serverCount = MmkvManager.decodeServerList(accountId).size
-        val refreshMinutes = metadata?.refreshIntervalMinutes
-            ?.takeIf { it > 0L }
-            ?: subscription.updateInterval.takeIf { it > 0L }
         val details = buildList {
-            add(resources.getQuantityString(R.plurals.simple_server_count, serverCount, serverCount))
-            refreshMinutes?.let {
-                add(getString(R.string.simple_refresh_every, formatRefreshInterval(it)))
+            metadata?.user?.takeIf { it.isNotBlank() }?.let {
+                add(getString(R.string.simple_panel_user, it))
             }
-            metadata?.metadataVersion?.let {
-                add(getString(R.string.simple_metadata_version, it))
+            metadata?.startsOn?.takeIf { it.isNotBlank() }?.let {
+                add(getString(R.string.simple_starts_on, displayDateValue(it)))
             }
+            metadata?.let(::displayExpiryDate)?.let {
+                add(getString(R.string.simple_expires_on, it))
+            }
+            if (isEmpty()) add(getString(R.string.simple_account_details_unavailable))
         }.joinToString(" • ")
 
         return AccountDashboardItem(
@@ -230,18 +208,6 @@ class MainActivity : HelperBaseActivity() {
             title = metadata?.workspace
                 ?.takeIf { it.isNotBlank() }
                 ?: subscription.remarks.ifBlank { getString(R.string.simple_default_account_name) },
-            status = status,
-            statusColor = ContextCompat.getColor(this, statusColor(rawStatus)),
-            user = metadata?.user
-                ?.takeIf { it.isNotBlank() }
-                ?.let { getString(R.string.simple_panel_user, it) }
-                ?: getString(R.string.simple_panel_user, getString(R.string.simple_value_unavailable)),
-            remaining = metadata?.let(::formatRemainingTime)
-                ?: getString(
-                    if (metadata == null) R.string.simple_refresh_for_account_details
-                    else R.string.simple_no_expiry_information,
-                ),
-            dates = getString(R.string.simple_account_dates, startDate, expiryDate),
             details = details,
             telegramUrl = metadata?.telegramUrl?.takeIf { it.isNotBlank() },
         )
@@ -262,9 +228,12 @@ class MainActivity : HelperBaseActivity() {
             ?.let { expiryDate ->
                 return when (val days = ChronoUnit.DAYS.between(LocalDate.now(), expiryDate)) {
                     in Long.MIN_VALUE..-1L -> getString(R.string.simple_expired)
-                    0L -> getString(R.string.simple_expires_today)
-                    1L -> getString(R.string.simple_one_day_remaining)
-                    else -> getString(R.string.simple_days_remaining, days)
+                    0L -> getString(R.string.simple_today)
+                    else -> resources.getQuantityString(
+                        R.plurals.simple_days_short,
+                        days.toInt(),
+                        days,
+                    )
                 }
             }
 
@@ -273,21 +242,13 @@ class MainActivity : HelperBaseActivity() {
         if (seconds <= 0L) return getString(R.string.simple_expired)
         val days = seconds / SECONDS_PER_DAY
         if (days > 0L) {
-            return if (days == 1L) {
-                getString(R.string.simple_one_day_remaining)
-            } else {
-                getString(R.string.simple_days_remaining, days)
-            }
+            return resources.getQuantityString(R.plurals.simple_days_short, days.toInt(), days)
         }
         val hours = seconds / SECONDS_PER_HOUR
         return if (hours > 0L) {
-            if (hours == 1L) {
-                getString(R.string.simple_one_hour_remaining)
-            } else {
-                getString(R.string.simple_hours_remaining, hours)
-            }
+            resources.getQuantityString(R.plurals.simple_hours_short, hours.toInt(), hours)
         } else {
-            getString(R.string.simple_less_than_hour_remaining)
+            getString(R.string.simple_less_than_one_hour_short)
         }
     }
 
@@ -307,14 +268,6 @@ class MainActivity : HelperBaseActivity() {
         return if (datePrefix.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) datePrefix else value
     }
 
-    private fun formatRefreshInterval(minutes: Long): String = when {
-        minutes % MINUTES_PER_DAY == 0L ->
-            getString(R.string.simple_interval_days, minutes / MINUTES_PER_DAY)
-        minutes % MINUTES_PER_HOUR == 0L ->
-            getString(R.string.simple_interval_hours, minutes / MINUTES_PER_HOUR)
-        else -> getString(R.string.simple_interval_minutes, minutes)
-    }
-
     @Suppress("UNUSED_PARAMETER")
     fun refreshGroupTabTitles(refreshAll: Boolean = false) {
         val subscriptions = MmkvManager.decodeSubscriptions()
@@ -324,34 +277,84 @@ class MainActivity : HelperBaseActivity() {
         val accountItems = subscriptions.map {
             accountDashboardItem(it.guid, it.subscription)
         }
-        val activeAccounts = subscriptions.count {
-            it.subscription.panelMetadata?.status.equals("active", ignoreCase = true)
-        }
-        val totalServers = subscriptions.sumOf {
-            MmkvManager.decodeServerList(it.guid).size
-        }
 
         accountDashboardAdapter.submitItems(accountItems, selectedId)
-        binding.tvDashboardAccounts.text = subscriptions.size.toString()
-        binding.tvDashboardActive.text = activeAccounts.toString()
-        binding.tvDashboardServers.text = totalServers.toString()
-        binding.tvAccountsCount.text = resources.getQuantityString(
+        binding.tvAccountsTitle.text = resources.getQuantityString(
             R.plurals.simple_account_count,
             subscriptions.size,
             subscriptions.size,
         )
         binding.accountRecycler.isVisible = subscriptions.isNotEmpty()
         binding.accountEmptyCard.isVisible = subscriptions.isEmpty()
-        showSelectedServerCount(selectedId)
+        showSelectedAccount(selectedId)
     }
 
-    private fun showSelectedServerCount(accountId: String?) {
+    private fun showSelectedAccount(accountId: String?) {
+        val subscription = accountId?.let(MmkvManager::decodeSubscription)
+        val metadata = subscription?.panelMetadata
+        val rawStatus = metadata?.status?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+        val status = when (rawStatus) {
+            "active" -> getString(R.string.simple_status_active)
+            "scheduled" -> getString(R.string.simple_status_scheduled)
+            "disabled" -> getString(R.string.simple_status_disabled)
+            "expired" -> getString(R.string.simple_status_expired)
+            null -> getString(
+                if (subscription == null) R.string.simple_status_no_account
+                else R.string.simple_status_not_synced,
+            )
+            else -> getString(R.string.simple_status_unknown)
+        }
+        val color = ContextCompat.getColor(this, statusColor(rawStatus))
+        binding.accountStatusDot.backgroundTintList = ColorStateList.valueOf(color)
+        binding.tvAccountStatus.text = getString(R.string.simple_status_value, status)
+        binding.tvAccountRemaining.text = metadata?.let(::formatRemainingTime)
+            ?: getString(R.string.simple_value_unavailable)
+        binding.accountExpiryProgress.setIndicatorColor(color)
+        binding.accountExpiryProgress.setProgressCompat(
+            accountExpiryProgress(subscription),
+            true,
+        )
+
         val count = accountId?.let { MmkvManager.decodeServerList(it).size } ?: 0
         binding.tvSelectedServerCount.text = resources.getQuantityString(
             R.plurals.simple_server_count,
             count,
             count,
         )
+    }
+
+    private fun accountExpiryProgress(subscription: SubscriptionItem?): Int {
+        val metadata = subscription?.panelMetadata ?: return 0
+        val status = metadata.status?.lowercase()
+        if (status == "expired" || status == "disabled" || status == "scheduled") return 0
+
+        val expiry = metadataExpiryMillis(metadata) ?: return if (status == "active") 100 else 0
+        val start = metadataStartMillis(metadata) ?: subscription.addedTime
+        val duration = expiry - start
+        if (duration <= 0L) return 0
+        return (((expiry - System.currentTimeMillis()).toDouble() / duration) * 100)
+            .toInt()
+            .coerceIn(0, 100)
+    }
+
+    private fun metadataExpiryMillis(metadata: PanelSubscriptionMetadata): Long? {
+        metadata.expireEpochSeconds?.let { return it * 1000L }
+        return metadata.expiresAt?.let(::panelDateMillis)
+    }
+
+    private fun metadataStartMillis(metadata: PanelSubscriptionMetadata): Long? =
+        metadata.startsOn?.let(::panelDateMillis)
+
+    private fun panelDateMillis(value: String): Long? {
+        value.toLongOrNull()?.let { numeric ->
+            return if (numeric > EPOCH_MILLISECONDS_THRESHOLD) numeric else numeric * 1000L
+        }
+        return value.take(10)
+            .takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
+            ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            ?.atStartOfDay(ZoneId.systemDefault())
+            ?.toInstant()
+            ?.toEpochMilli()
     }
 
     private fun handleFabAction() {
@@ -964,7 +967,6 @@ class MainActivity : HelperBaseActivity() {
         private const val MAX_SUBSCRIPTION_NAME_LENGTH = 80
         private const val SECONDS_PER_HOUR = 60L * 60L
         private const val SECONDS_PER_DAY = 24L * SECONDS_PER_HOUR
-        private const val MINUTES_PER_HOUR = 60L
-        private const val MINUTES_PER_DAY = 24L * MINUTES_PER_HOUR
+        private const val EPOCH_MILLISECONDS_THRESHOLD = 10_000_000_000L
     }
 }

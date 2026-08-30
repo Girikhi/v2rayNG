@@ -12,11 +12,6 @@ import com.v2ray.ang.databinding.ItemAccountDashboardBinding
 data class AccountDashboardItem(
     val id: String,
     val title: String,
-    val status: String,
-    val statusColor: Int,
-    val user: String,
-    val remaining: String,
-    val dates: String,
     val details: String,
     val telegramUrl: String?,
 )
@@ -71,21 +66,14 @@ class AccountDashboardAdapter(
                 context,
                 if (selected) R.color.color_fab_active else R.color.md_theme_outlineVariant,
             )
-            binding.accountCard.cardElevation = if (selected) 2.dp(context).toFloat() else 0f
+            binding.accountCard.cardElevation = if (selected) 1.dp(context).toFloat() else 0f
             binding.accountCard.contentDescription = context.getString(
                 if (selected) R.string.simple_selected_account_description
                 else R.string.simple_account_description,
                 item.title,
             )
-
             binding.tvAccountName.text = item.title
-            binding.tvAccountStatus.text = item.status
-            binding.accountStatusCard.setCardBackgroundColor(item.statusColor)
-            binding.tvAccountUser.text = item.user
-            binding.tvAccountRemaining.text = item.remaining
-            binding.tvAccountDates.text = item.dates
             binding.tvAccountDetails.text = item.details
-
             binding.buttonAccountTelegram.isVisible = item.telegramUrl != null
             binding.buttonAccountTelegram.setOnClickListener(
                 item.telegramUrl?.let { url -> android.view.View.OnClickListener { onTelegramSelected(url) } },
