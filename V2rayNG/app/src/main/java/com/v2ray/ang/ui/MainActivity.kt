@@ -16,11 +16,13 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayoutMediator
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.databinding.ActivityMainBinding
+import com.v2ray.ang.dto.entities.PanelSubscriptionMetadata
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.enums.EConfigType
@@ -40,6 +42,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 class MainActivity : HelperBaseActivity() {
     private val binding by lazy {
@@ -49,6 +56,11 @@ class MainActivity : HelperBaseActivity() {
     val mainViewModel: MainViewModel by viewModels()
     private lateinit var groupPagerAdapter: GroupPagerAdapter
     private var tabMediator: TabLayoutMediator? = null
+    private val pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
+        override fun onPageSelected(position: Int) {
+            showSubscriptionMetadata(groupPagerAdapter.groups.getOrNull(position)?.id)
+        }
+    }
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == RESULT_OK) {
@@ -74,6 +86,7 @@ class MainActivity : HelperBaseActivity() {
         groupPagerAdapter = GroupPagerAdapter(this, emptyList())
         binding.viewPager.adapter = groupPagerAdapter
         binding.viewPager.isUserInputEnabled = true
+        binding.viewPager.registerOnPageChangeCallback(pageChangeCallback)
 
         binding.fab.setOnClickListener { handleFabAction() }
         binding.buttonAdd.setOnClickListener { showAddSubscriptionMenu(it) }
@@ -139,7 +152,136 @@ class MainActivity : HelperBaseActivity() {
 
         binding.tabGroup.isVisible = groups.isNotEmpty()
         binding.subscriptionLabel.isVisible = groups.isNotEmpty()
+        showSubscriptionMetadata(groups.getOrNull(targetIndex)?.id)
         refreshGroupTabTitles(true)
+    }
+
+    private fun showSubscriptionMetadata(subscriptionId: String?) {
+        val subscription = subscriptionId
+            ?.takeIf { it.isNotEmpty() }
+            ?.let(MmkvManager::decodeSubscription)
+        val metadata = subscription?.panelMetadata
+        if (subscription == null || metadata == null) {
+            binding.subscriptionMetadataCard.isVisible = false
+            return
+        }
+
+        binding.subscriptionMetadataCard.isVisible = true
+        binding.tvPanelWorkspace.text = metadata.workspace
+            ?.takeIf { it.isNotBlank() }
+            ?: subscription.remarks
+
+        val user = metadata.user?.takeIf { it.isNotBlank() }
+        binding.tvPanelUser.isVisible = user != null
+        binding.tvPanelUser.text = user?.let { getString(R.string.simple_panel_user, it) }.orEmpty()
+
+        val status = metadata.status?.takeIf { it.isNotBlank() }
+        binding.panelStatusCard.isVisible = status != null
+        if (status != null) {
+            binding.tvPanelStatus.text = status.replaceFirstChar { it.uppercaseChar() }
+            binding.panelStatusCard.setCardBackgroundColor(
+                ContextCompat.getColor(this, statusColor(status))
+            )
+        }
+
+        val remaining = formatRemainingTime(metadata)
+        binding.tvPanelRemaining.isVisible = remaining != null
+        binding.tvPanelRemaining.text = remaining.orEmpty()
+
+        val dates = buildList {
+            metadata.startsOn?.takeIf { it.isNotBlank() }?.let {
+                add(getString(R.string.simple_starts_on, displayDateValue(it)))
+            }
+            displayExpiryDate(metadata)?.let {
+                add(getString(R.string.simple_expires_on, it))
+            }
+        }
+        binding.tvPanelDates.isVisible = dates.isNotEmpty()
+        binding.tvPanelDates.text = dates.joinToString(" • ")
+
+        val details = buildList {
+            metadata.refreshIntervalMinutes?.takeIf { it > 0L }?.let {
+                add(getString(R.string.simple_refresh_every, formatRefreshInterval(it)))
+            }
+            metadata.metadataVersion?.let {
+                add(getString(R.string.simple_metadata_version, it))
+            }
+        }
+        val telegramUrl = metadata.telegramUrl?.takeIf { it.isNotBlank() }
+        binding.panelMetadataFooter.isVisible = details.isNotEmpty() || telegramUrl != null
+        binding.tvPanelMetadataDetails.text = details.joinToString(" • ")
+        binding.buttonPanelTelegram.isVisible = telegramUrl != null
+        binding.buttonPanelTelegram.setOnClickListener(
+            telegramUrl?.let { url -> View.OnClickListener { Utils.openUri(this, url) } }
+        )
+    }
+
+    private fun statusColor(status: String): Int = when (status) {
+        "active" -> R.color.colorPing
+        "scheduled" -> R.color.color_fab_active
+        "expired" -> R.color.colorPingRed
+        else -> R.color.color_fab_inactive
+    }
+
+    private fun formatRemainingTime(metadata: PanelSubscriptionMetadata): String? {
+        metadata.expiresAt
+            ?.take(10)
+            ?.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
+            ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            ?.let { expiryDate ->
+                return when (val days = ChronoUnit.DAYS.between(LocalDate.now(), expiryDate)) {
+                    in Long.MIN_VALUE..-1L -> getString(R.string.simple_expired)
+                    0L -> getString(R.string.simple_expires_today)
+                    1L -> getString(R.string.simple_one_day_remaining)
+                    else -> getString(R.string.simple_days_remaining, days)
+                }
+            }
+
+        val expiry = metadata.expireEpochSeconds ?: return null
+        val seconds = expiry - Instant.now().epochSecond
+        if (seconds <= 0L) return getString(R.string.simple_expired)
+        val days = seconds / SECONDS_PER_DAY
+        if (days > 0L) {
+            return if (days == 1L) {
+                getString(R.string.simple_one_day_remaining)
+            } else {
+                getString(R.string.simple_days_remaining, days)
+            }
+        }
+        val hours = seconds / SECONDS_PER_HOUR
+        return if (hours > 0L) {
+            if (hours == 1L) {
+                getString(R.string.simple_one_hour_remaining)
+            } else {
+                getString(R.string.simple_hours_remaining, hours)
+            }
+        } else {
+            getString(R.string.simple_less_than_hour_remaining)
+        }
+    }
+
+    private fun displayExpiryDate(metadata: PanelSubscriptionMetadata): String? {
+        metadata.expiresAt?.takeIf { it.isNotBlank() }?.let { raw ->
+            if (raw.toLongOrNull() == null) return displayDateValue(raw)
+        }
+        val expiry = metadata.expireEpochSeconds ?: return null
+        return Instant.ofEpochSecond(expiry)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .format(DateTimeFormatter.ISO_LOCAL_DATE)
+    }
+
+    private fun displayDateValue(value: String): String {
+        val datePrefix = value.take(10)
+        return if (datePrefix.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) datePrefix else value
+    }
+
+    private fun formatRefreshInterval(minutes: Long): String = when {
+        minutes % MINUTES_PER_DAY == 0L ->
+            getString(R.string.simple_interval_days, minutes / MINUTES_PER_DAY)
+        minutes % MINUTES_PER_HOUR == 0L ->
+            getString(R.string.simple_interval_hours, minutes / MINUTES_PER_HOUR)
+        else -> getString(R.string.simple_interval_minutes, minutes)
     }
 
     fun refreshGroupTabTitles(refreshAll: Boolean = false) {
@@ -587,6 +729,12 @@ class MainActivity : HelperBaseActivity() {
                     mainViewModel.reloadServerList()
                     refreshGroupTabTitles()
                 }
+                if (mainViewModel.subscriptionId.isNotEmpty()) {
+                    SubscriptionUpdater.syncOne(subId = mainViewModel.subscriptionId)
+                } else {
+                    SubscriptionUpdater.sync(forceReschedule = true)
+                }
+                showSubscriptionMetadata(mainViewModel.subscriptionId)
                 hideLoading()
             }
         }
@@ -755,6 +903,7 @@ class MainActivity : HelperBaseActivity() {
 
 
     override fun onDestroy() {
+        binding.viewPager.unregisterOnPageChangeCallback(pageChangeCallback)
         tabMediator?.detach()
         super.onDestroy()
     }
@@ -763,5 +912,9 @@ class MainActivity : HelperBaseActivity() {
         private const val ADD_FROM_CLIPBOARD = 1
         private const val ADD_FROM_QR_CODE = 2
         private const val MAX_SUBSCRIPTION_NAME_LENGTH = 80
+        private const val SECONDS_PER_HOUR = 60L * 60L
+        private const val SECONDS_PER_DAY = 24L * SECONDS_PER_HOUR
+        private const val MINUTES_PER_HOUR = 60L
+        private const val MINUTES_PER_DAY = 24L * MINUTES_PER_HOUR
     }
 }

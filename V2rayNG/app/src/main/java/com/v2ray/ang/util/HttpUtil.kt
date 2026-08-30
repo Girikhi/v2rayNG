@@ -17,6 +17,7 @@ import java.net.MalformedURLException
 import java.net.Proxy
 import java.net.URI
 import java.net.URL
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 object HttpUtil {
@@ -143,7 +144,10 @@ object HttpUtil {
      * @throws IOException If an I/O error occurs.
      */
     @Throws(IOException::class)
-    fun getUrlContentWithUserAgent(request: UrlContentRequest): String {
+    fun getUrlContentWithUserAgent(
+        request: UrlContentRequest,
+        onResponseHeaders: ((Map<String, String>) -> Unit)? = null
+    ): String {
         var currentUrl = request.url
         var redirects = 0
         val maxRedirects = 3
@@ -183,16 +187,24 @@ object HttpUtil {
                     }
 
                     response.isSuccessful -> {
+                        onResponseHeaders?.invoke(responseHeaders(response))
                         return response.body?.string() ?: ""
                     }
 
                     else -> {
+                        onResponseHeaders?.invoke(responseHeaders(response))
                         throw IOException("Request failed with status code ${response.code}")
                     }
                 }
             }
         }
         throw IOException("Too many redirects")
+    }
+
+    private fun responseHeaders(response: okhttp3.Response): Map<String, String> {
+        return response.headers.names().associate { name ->
+            name.lowercase(Locale.ROOT) to response.header(name).orEmpty()
+        }
     }
 
     private fun applyEmbeddedBasicAuthHeader(rawUrl: String, requestBuilder: Request.Builder) {

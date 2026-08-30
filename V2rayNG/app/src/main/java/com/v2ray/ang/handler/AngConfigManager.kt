@@ -552,6 +552,11 @@ object AngConfigManager {
             val userAgent = it.subscription.userAgent
             val proxyUsername = SettingsManager.getSocksUsername()
             val proxyPassword = SettingsManager.getSocksPassword()
+            val captureMetadata: (Map<String, String>) -> Unit = { headers ->
+                if (SubscriptionMetadataManager.updateFromHeaders(it.subscription, headers)) {
+                    MmkvManager.encodeSubscription(it.guid, it.subscription)
+                }
+            }
 
             var configText = try {
                 val httpPort = SettingsManager.getHttpPort()
@@ -563,7 +568,8 @@ object AngConfigManager {
                         httpPort = httpPort,
                         proxyUsername = proxyUsername,
                         proxyPassword = proxyPassword
-                    )
+                    ),
+                    captureMetadata
                 )
             } catch (e: Exception) {
                 LogUtil.e(AppConfig.ANG_PACKAGE, "Update subscription: proxy not ready or other error", e)
@@ -575,7 +581,8 @@ object AngConfigManager {
                         UrlContentRequest(
                             url = url,
                             userAgent = userAgent
-                        )
+                        ),
+                        captureMetadata
                     )
                 } catch (e: Exception) {
                     LogUtil.e(AppConfig.TAG, "Update subscription: Failed to get URL content with user agent", e)
