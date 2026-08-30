@@ -16,8 +16,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.viewpager2.widget.ViewPager2
-import com.google.android.material.tabs.TabLayoutMediator
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.core.CoreServiceManager
@@ -55,10 +55,16 @@ class MainActivity : HelperBaseActivity() {
 
     val mainViewModel: MainViewModel by viewModels()
     private lateinit var groupPagerAdapter: GroupPagerAdapter
-    private var tabMediator: TabLayoutMediator? = null
+    private lateinit var accountDashboardAdapter: AccountDashboardAdapter
     private val pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
         override fun onPageSelected(position: Int) {
-            showSubscriptionMetadata(groupPagerAdapter.groups.getOrNull(position)?.id)
+            val accountId = groupPagerAdapter.groups.getOrNull(position)?.id ?: return
+            if (mainViewModel.subscriptionId != accountId) {
+                mainViewModel.subscriptionIdChanged(accountId)
+            }
+            accountDashboardAdapter.selectAccount(accountId)
+            binding.accountRecycler.smoothScrollToPosition(position)
+            showSelectedServerCount(accountId)
         }
     }
 
@@ -82,11 +88,33 @@ class MainActivity : HelperBaseActivity() {
         setContentView(binding.root)
         setupTopBar()
 
-        // setup viewpager and tablayout
+        // The server pages stay lightweight; the account rail is a separate dashboard view.
         groupPagerAdapter = GroupPagerAdapter(this, emptyList())
         binding.viewPager.adapter = groupPagerAdapter
         binding.viewPager.isUserInputEnabled = true
         binding.viewPager.registerOnPageChangeCallback(pageChangeCallback)
+
+        accountDashboardAdapter = AccountDashboardAdapter(
+            onAccountSelected = { position, accountId ->
+                accountDashboardAdapter.selectAccount(accountId)
+                if (binding.viewPager.currentItem == position) {
+                    if (mainViewModel.subscriptionId != accountId) {
+                        mainViewModel.subscriptionIdChanged(accountId)
+                    }
+                    showSelectedServerCount(accountId)
+                } else {
+                    binding.viewPager.setCurrentItem(position, true)
+                }
+            },
+            onTelegramSelected = { url -> Utils.openUri(this, url) },
+        )
+        binding.accountRecycler.layoutManager = LinearLayoutManager(
+            this,
+            LinearLayoutManager.HORIZONTAL,
+            false,
+        )
+        binding.accountRecycler.setHasFixedSize(true)
+        binding.accountRecycler.adapter = accountDashboardAdapter
 
         binding.fab.setOnClickListener { handleFabAction() }
         binding.buttonAdd.setOnClickListener { showAddSubscriptionMenu(it) }
@@ -103,7 +131,7 @@ class MainActivity : HelperBaseActivity() {
     }
 
     private fun setupTopBar() {
-        binding.toolbar.navigationContentDescription = getString(R.string.title_sub_setting)
+        binding.toolbar.navigationContentDescription = getString(R.string.title_account_setting)
         binding.toolbar.setNavigationOnClickListener {
             requestActivityLauncher.launch(Intent(this, SubSettingActivity::class.java))
         }
@@ -134,89 +162,92 @@ class MainActivity : HelperBaseActivity() {
     }
 
     private fun setupGroupTab() {
-        val groups = mainViewModel.getSubscriptions(this)
+        val groups = mainViewModel.getSubscriptions()
         groupPagerAdapter.update(groups)
 
-        tabMediator?.detach()
-        tabMediator = TabLayoutMediator(binding.tabGroup, binding.viewPager) { tab, position ->
-            groupPagerAdapter.groups.getOrNull(position)?.let {
-                tab.text = it.remarks
-                tab.tag = it.id
-            }
-        }.also { it.attach() }
-
-        val targetIndex = groups.indexOfFirst { it.id == mainViewModel.subscriptionId }.takeIf { it >= 0 } ?: (groups.size - 1)
+        val targetIndex = if (groups.isEmpty()) {
+            -1
+        } else {
+            groups.indexOfFirst { it.id == mainViewModel.subscriptionId }
+                .takeIf { it >= 0 }
+                ?: 0
+        }
         if (targetIndex >= 0) {
             binding.viewPager.setCurrentItem(targetIndex, false)
+            val accountId = groups[targetIndex].id
+            if (mainViewModel.subscriptionId != accountId) {
+                mainViewModel.subscriptionIdChanged(accountId)
+            }
+            accountDashboardAdapter.selectAccount(accountId)
+        } else if (mainViewModel.subscriptionId.isNotEmpty()) {
+            mainViewModel.subscriptionIdChanged("")
         }
 
-        binding.tabGroup.isVisible = groups.isNotEmpty()
-        binding.subscriptionLabel.isVisible = groups.isNotEmpty()
-        showSubscriptionMetadata(groups.getOrNull(targetIndex)?.id)
+        binding.accountRecycler.isVisible = groups.isNotEmpty()
+        binding.accountEmptyCard.isVisible = groups.isEmpty()
         refreshGroupTabTitles(true)
+        if (targetIndex >= 0) {
+            binding.accountRecycler.scrollToPosition(targetIndex)
+        }
     }
 
-    private fun showSubscriptionMetadata(subscriptionId: String?) {
-        val subscription = subscriptionId
-            ?.takeIf { it.isNotEmpty() }
-            ?.let(MmkvManager::decodeSubscription)
-        val metadata = subscription?.panelMetadata
-        if (subscription == null || metadata == null) {
-            binding.subscriptionMetadataCard.isVisible = false
-            return
+    private fun accountDashboardItem(
+        accountId: String,
+        subscription: SubscriptionItem,
+    ): AccountDashboardItem {
+        val metadata = subscription.panelMetadata
+        val rawStatus = metadata?.status?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+        val status = when (rawStatus) {
+            "active" -> getString(R.string.simple_status_active)
+            "scheduled" -> getString(R.string.simple_status_scheduled)
+            "disabled" -> getString(R.string.simple_status_disabled)
+            "expired" -> getString(R.string.simple_status_expired)
+            null -> getString(R.string.simple_status_not_synced)
+            else -> getString(R.string.simple_status_unknown)
         }
-
-        binding.subscriptionMetadataCard.isVisible = true
-        binding.tvPanelWorkspace.text = metadata.workspace
+        val startDate = metadata?.startsOn
             ?.takeIf { it.isNotBlank() }
-            ?: subscription.remarks
-
-        val user = metadata.user?.takeIf { it.isNotBlank() }
-        binding.tvPanelUser.isVisible = user != null
-        binding.tvPanelUser.text = user?.let { getString(R.string.simple_panel_user, it) }.orEmpty()
-
-        val status = metadata.status?.takeIf { it.isNotBlank() }
-        binding.panelStatusCard.isVisible = status != null
-        if (status != null) {
-            binding.tvPanelStatus.text = status.replaceFirstChar { it.uppercaseChar() }
-            binding.panelStatusCard.setCardBackgroundColor(
-                ContextCompat.getColor(this, statusColor(status))
-            )
-        }
-
-        val remaining = formatRemainingTime(metadata)
-        binding.tvPanelRemaining.isVisible = remaining != null
-        binding.tvPanelRemaining.text = remaining.orEmpty()
-
-        val dates = buildList {
-            metadata.startsOn?.takeIf { it.isNotBlank() }?.let {
-                add(getString(R.string.simple_starts_on, displayDateValue(it)))
-            }
-            displayExpiryDate(metadata)?.let {
-                add(getString(R.string.simple_expires_on, it))
-            }
-        }
-        binding.tvPanelDates.isVisible = dates.isNotEmpty()
-        binding.tvPanelDates.text = dates.joinToString(" • ")
-
+            ?.let(::displayDateValue)
+            ?: getString(R.string.simple_value_unavailable)
+        val expiryDate = metadata?.let(::displayExpiryDate)
+            ?: getString(R.string.simple_value_unavailable)
+        val serverCount = MmkvManager.decodeServerList(accountId).size
+        val refreshMinutes = metadata?.refreshIntervalMinutes
+            ?.takeIf { it > 0L }
+            ?: subscription.updateInterval.takeIf { it > 0L }
         val details = buildList {
-            metadata.refreshIntervalMinutes?.takeIf { it > 0L }?.let {
+            add(resources.getQuantityString(R.plurals.simple_server_count, serverCount, serverCount))
+            refreshMinutes?.let {
                 add(getString(R.string.simple_refresh_every, formatRefreshInterval(it)))
             }
-            metadata.metadataVersion?.let {
+            metadata?.metadataVersion?.let {
                 add(getString(R.string.simple_metadata_version, it))
             }
-        }
-        val telegramUrl = metadata.telegramUrl?.takeIf { it.isNotBlank() }
-        binding.panelMetadataFooter.isVisible = details.isNotEmpty() || telegramUrl != null
-        binding.tvPanelMetadataDetails.text = details.joinToString(" • ")
-        binding.buttonPanelTelegram.isVisible = telegramUrl != null
-        binding.buttonPanelTelegram.setOnClickListener(
-            telegramUrl?.let { url -> View.OnClickListener { Utils.openUri(this, url) } }
+        }.joinToString(" • ")
+
+        return AccountDashboardItem(
+            id = accountId,
+            title = metadata?.workspace
+                ?.takeIf { it.isNotBlank() }
+                ?: subscription.remarks.ifBlank { getString(R.string.simple_default_account_name) },
+            status = status,
+            statusColor = ContextCompat.getColor(this, statusColor(rawStatus)),
+            user = metadata?.user
+                ?.takeIf { it.isNotBlank() }
+                ?.let { getString(R.string.simple_panel_user, it) }
+                ?: getString(R.string.simple_panel_user, getString(R.string.simple_value_unavailable)),
+            remaining = metadata?.let(::formatRemainingTime)
+                ?: getString(
+                    if (metadata == null) R.string.simple_refresh_for_account_details
+                    else R.string.simple_no_expiry_information,
+                ),
+            dates = getString(R.string.simple_account_dates, startDate, expiryDate),
+            details = details,
+            telegramUrl = metadata?.telegramUrl?.takeIf { it.isNotBlank() },
         )
     }
 
-    private fun statusColor(status: String): Int = when (status) {
+    private fun statusColor(status: String?): Int = when (status) {
         "active" -> R.color.colorPing
         "scheduled" -> R.color.color_fab_active
         "expired" -> R.color.colorPingRed
@@ -284,23 +315,43 @@ class MainActivity : HelperBaseActivity() {
         else -> getString(R.string.simple_interval_minutes, minutes)
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun refreshGroupTabTitles(refreshAll: Boolean = false) {
-        val groupsToRefresh = if (refreshAll || mainViewModel.subscriptionId.isEmpty()) {
-            groupPagerAdapter.groups
-        } else {
-            groupPagerAdapter.groups.filter { it.id == mainViewModel.subscriptionId }
+        val subscriptions = MmkvManager.decodeSubscriptions()
+        val selectedId = mainViewModel.subscriptionId.takeIf { selected ->
+            subscriptions.any { it.guid == selected }
+        } ?: subscriptions.firstOrNull()?.guid
+        val accountItems = subscriptions.map {
+            accountDashboardItem(it.guid, it.subscription)
+        }
+        val activeAccounts = subscriptions.count {
+            it.subscription.panelMetadata?.status.equals("active", ignoreCase = true)
+        }
+        val totalServers = subscriptions.sumOf {
+            MmkvManager.decodeServerList(it.guid).size
         }
 
-        groupsToRefresh.forEach { group ->
-            if (group.id.isEmpty()) {
-                return@forEach
-            }
-            val tabIndex = groupPagerAdapter.groups.indexOfFirst { it.id == group.id }
-            if (tabIndex >= 0) {
-                val count = MmkvManager.decodeServerList(group.id).size
-                binding.tabGroup.getTabAt(tabIndex)?.text = "${group.remarks} ($count)"
-            }
-        }
+        accountDashboardAdapter.submitItems(accountItems, selectedId)
+        binding.tvDashboardAccounts.text = subscriptions.size.toString()
+        binding.tvDashboardActive.text = activeAccounts.toString()
+        binding.tvDashboardServers.text = totalServers.toString()
+        binding.tvAccountsCount.text = resources.getQuantityString(
+            R.plurals.simple_account_count,
+            subscriptions.size,
+            subscriptions.size,
+        )
+        binding.accountRecycler.isVisible = subscriptions.isNotEmpty()
+        binding.accountEmptyCard.isVisible = subscriptions.isEmpty()
+        showSelectedServerCount(selectedId)
+    }
+
+    private fun showSelectedServerCount(accountId: String?) {
+        val count = accountId?.let { MmkvManager.decodeServerList(it).size } ?: 0
+        binding.tvSelectedServerCount.text = resources.getQuantityString(
+            R.plurals.simple_server_count,
+            count,
+            count,
+        )
     }
 
     private fun handleFabAction() {
@@ -455,7 +506,7 @@ class MainActivity : HelperBaseActivity() {
                     ?.take(MAX_SUBSCRIPTION_NAME_LENGTH)
                     .orEmpty()
         }.getOrDefault("").ifEmpty {
-            getString(R.string.simple_default_subscription_name)
+            getString(R.string.simple_default_account_name)
         }
     }
 
@@ -734,7 +785,7 @@ class MainActivity : HelperBaseActivity() {
                 } else {
                     SubscriptionUpdater.sync(forceReschedule = true)
                 }
-                showSubscriptionMetadata(mainViewModel.subscriptionId)
+                refreshGroupTabTitles(true)
                 hideLoading()
             }
         }

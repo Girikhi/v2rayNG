@@ -301,7 +301,8 @@
     <string name="title_del_duplicate_config">Delete duplicate config</string>
     <string name="title_del_invalid_config">Delete invalid config</string>
     <string name="title_export_all">Export configs to clipboard</string>
-    <string name="title_sub_setting">Subscription group setting</string>
+    <string name="title_sub_setting">Accounts</string>
+    <string name="title_account_setting">Accounts</string>
     <string name="sub_setting_remarks">remarks</string>
     <string name="sub_setting_url">Optional URL</string>
     <string name="sub_setting_user_agent">User Agent</string>
@@ -346,6 +347,31 @@
     <string name="simple_interval_minutes">%1$d min</string>
     <string name="simple_metadata_version">Metadata v%1$d</string>
     <string name="simple_open_telegram">Open Telegram</string>
+    <string name="simple_accounts">Accounts</string>
+    <string name="simple_active">Active</string>
+    <string name="simple_no_accounts">No accounts yet</string>
+    <string name="simple_add_first_account">Use Add to import your first account from the clipboard or a QR code.</string>
+    <string name="simple_default_account_name">Account</string>
+    <string name="simple_status_active">Active</string>
+    <string name="simple_status_scheduled">Scheduled</string>
+    <string name="simple_status_disabled">Disabled</string>
+    <string name="simple_status_expired">Expired</string>
+    <string name="simple_status_not_synced">Not synced</string>
+    <string name="simple_status_unknown">Unknown</string>
+    <string name="simple_value_unavailable">—</string>
+    <string name="simple_refresh_for_account_details">Refresh for account details</string>
+    <string name="simple_no_expiry_information">No expiry information</string>
+    <string name="simple_account_dates">Starts %1$s  •  Expires %2$s</string>
+    <string name="simple_account_description">Account %1$s</string>
+    <string name="simple_selected_account_description">Selected account %1$s</string>
+    <plurals name="simple_account_count">
+        <item quantity="one">%d account</item>
+        <item quantity="other">%d accounts</item>
+    </plurals>
+    <plurals name="simple_server_count">
+        <item quantity="one">%d server</item>
+        <item quantity="other">%d servers</item>
+    </plurals>
     <string name="title_real_ping_all_server">Real delay config</string>
     <string name="title_user_asset_setting">Asset files</string>
     <string name="title_sort_by_test_results">Sorting by test results</string>

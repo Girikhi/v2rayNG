@@ -224,11 +224,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Gets the subscriptions.
-     * @param context The context.
-     * @return A pair of lists containing the subscription IDs and remarks.
+     * Gets the real account groups shown by the dashboard.
      */
-    fun getSubscriptions(context: Context): List<GroupMapItem> {
+    fun getSubscriptions(): List<GroupMapItem> {
         val subscriptions = MmkvManager.decodeSubscriptions()
         if (subscriptionId.isNotEmpty()
             && !subscriptions.map { it.guid }.contains(subscriptionId)
@@ -236,24 +234,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             subscriptionIdChanged("")
         }
 
-        val groups = mutableListOf<GroupMapItem>()
-        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_GROUP_ALL_DISPLAY)) {
-            groups.add(
-                GroupMapItem(
-                    id = "",
-                    remarks = context.getString(R.string.filter_config_all)
-                )
+        return subscriptions.map { sub ->
+            GroupMapItem(
+                id = sub.guid,
+                remarks = sub.subscription.remarks,
             )
         }
-        subscriptions.forEach { sub ->
-            groups.add(
-                GroupMapItem(
-                    id = sub.guid,
-                    remarks = sub.subscription.remarks
-                )
-            )
-        }
-        return groups
     }
 
     /**
