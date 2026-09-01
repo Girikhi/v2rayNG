@@ -34,13 +34,25 @@
 
             <TextView
                 android:id="@+id/tv_accounts_title"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:text="@string/simple_accounts"
                 android:textColor="@color/md_theme_onBackground"
                 android:textSize="19sp"
                 android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/account_expand_icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:contentDescription="@null"
+                android:padding="8dp"
+                android:src="@drawable/ic_arrow_drop_down"
+                app:tint="@color/md_theme_onSurfaceVariant" />
 
         </LinearLayout>
 
@@ -56,6 +68,46 @@
 
     </LinearLayout>
 
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/account_drawer_card"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        app:cardBackgroundColor="@color/simple_surface"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="1dp"
+        app:strokeColor="@color/md_theme_outlineVariant"
+        app:strokeWidth="1dp">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="6dp">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/account_recycler"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:orientation="vertical"
+                android:overScrollMode="ifContentScrolls"
+                android:scrollbars="vertical" />
+
+            <TextView
+                android:id="@+id/account_drawer_empty"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="@string/simple_add_first_account_short"
+                android:textColor="@color/md_theme_onSurfaceVariant"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
     <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/progress_bar"
         android:layout_width="match_parent"
@@ -67,6 +119,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="20dp"
@@ -99,58 +152,61 @@
     <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/account_expiry_progress"
         android:layout_width="match_parent"
-        android:layout_height="8dp"
+        android:layout_height="14dp"
         android:layout_marginStart="20dp"
         android:layout_marginEnd="20dp"
         android:max="100"
         android:progress="0"
         app:indicatorColor="@color/color_fab_inactive"
         app:trackColor="@color/md_theme_primaryContainer"
-        app:trackCornerRadius="4dp"
-        app:trackThickness="8dp" />
+        app:trackCornerRadius="7dp"
+        app:trackThickness="14dp" />
 
-    <FrameLayout
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/workspace_card"
         android:layout_width="match_parent"
-        android:layout_height="70dp"
-        android:layout_marginTop="9dp">
+        android:layout_height="50dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="20dp"
+        app:cardBackgroundColor="@color/simple_surface"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp"
+        app:strokeColor="@color/md_theme_outlineVariant"
+        app:strokeWidth="1dp">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/account_recycler"
+        <TextView
+            android:id="@+id/tv_workspace_name"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:orientation="horizontal"
-            android:overScrollMode="never"
-            android:paddingStart="20dp"
-            android:paddingTop="4dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="8dp"
-            android:scrollbars="none" />
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="@string/simple_value_unavailable"
+            android:textColor="@color/md_theme_onSurface"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/account_empty_card"
-            android:layout_width="match_parent"
-            android:layout_height="58dp"
-            android:layout_marginStart="20dp"
-            android:layout_marginEnd="20dp"
-            android:visibility="gone"
-            app:cardBackgroundColor="@color/simple_surface"
-            app:cardCornerRadius="14dp"
-            app:cardElevation="0dp"
-            app:strokeColor="@color/md_theme_outlineVariant"
-            app:strokeWidth="1dp">
+    </com.google.android.material.card.MaterialCardView>
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:text="@string/simple_add_first_account_short"
-                android:textColor="@color/md_theme_onSurfaceVariant"
-                android:textSize="14sp" />
-
-        </com.google.android.material.card.MaterialCardView>
-
-    </FrameLayout>
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/button_telegram_channel"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="2dp"
+        android:contentDescription="@string/simple_open_telegram"
+        android:minHeight="40dp"
+        android:textAllCaps="false"
+        android:textColor="@color/md_theme_primary"
+        android:textSize="12sp"
+        android:visibility="gone"
+        app:icon="@drawable/ic_telegram_24dp"
+        app:iconPadding="6dp"
+        app:iconTint="@color/md_theme_primary" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -257,6 +313,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="38dp"
+        android:layout_marginTop="10dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="20dp"

@@ -4,21 +4,20 @@ import android.annotation.SuppressLint
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
-import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ItemAccountDashboardBinding
 
 data class AccountDashboardItem(
     val id: String,
-    val title: String,
-    val details: String,
-    val telegramUrl: String?,
+    val user: String,
+    val workspace: String,
 )
 
 class AccountDashboardAdapter(
     private val onAccountSelected: (position: Int, id: String) -> Unit,
-    private val onTelegramSelected: (url: String) -> Unit,
+    private val onShareSelected: (id: String) -> Unit,
+    private val onDeleteSelected: (id: String) -> Unit,
 ) : RecyclerView.Adapter<AccountDashboardAdapter.AccountViewHolder>() {
     private var items: List<AccountDashboardItem> = emptyList()
     private var selectedId: String? = null
@@ -66,18 +65,15 @@ class AccountDashboardAdapter(
                 context,
                 if (selected) R.color.color_fab_active else R.color.md_theme_outlineVariant,
             )
-            binding.accountCard.cardElevation = if (selected) 1.dp(context).toFloat() else 0f
             binding.accountCard.contentDescription = context.getString(
                 if (selected) R.string.simple_selected_account_description
                 else R.string.simple_account_description,
-                item.title,
+                item.user,
             )
-            binding.tvAccountName.text = item.title
-            binding.tvAccountDetails.text = item.details
-            binding.buttonAccountTelegram.isVisible = item.telegramUrl != null
-            binding.buttonAccountTelegram.setOnClickListener(
-                item.telegramUrl?.let { url -> android.view.View.OnClickListener { onTelegramSelected(url) } },
-            )
+            binding.tvAccountName.text = item.user
+            binding.tvAccountDetails.text = item.workspace
+            binding.buttonAccountShare.setOnClickListener { onShareSelected(item.id) }
+            binding.buttonAccountDelete.setOnClickListener { onDeleteSelected(item.id) }
             binding.root.setOnClickListener {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {

@@ -349,6 +349,11 @@
     <string name="simple_open_telegram">Open Telegram</string>
     <string name="simple_accounts">Accounts</string>
     <string name="simple_settings">Settings</string>
+    <string name="simple_open_accounts">Open accounts</string>
+    <string name="simple_close_accounts">Close accounts</string>
+    <string name="simple_share_account">Share account</string>
+    <string name="simple_delete_account">Delete</string>
+    <string name="simple_delete_account_confirm">Delete %1$s and all of its servers?</string>
     <string name="simple_status">Status</string>
     <string name="simple_status_value">Status · %1$s</string>
     <string name="simple_status_no_account">No account</string>

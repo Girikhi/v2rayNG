@@ -6,11 +6,11 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginStart="16dp"
-    android:layout_marginTop="4dp"
+    android:layout_marginTop="2dp"
     android:layout_marginEnd="16dp"
-    android:layout_marginBottom="4dp"
+    android:layout_marginBottom="2dp"
     app:cardBackgroundColor="@color/simple_surface"
-    app:cardCornerRadius="16dp"
+    app:cardCornerRadius="12dp"
     app:cardElevation="0dp"
     app:strokeColor="@color/md_theme_outlineVariant"
     app:strokeWidth="1dp">
@@ -23,17 +23,17 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
-        android:minHeight="60dp"
+        android:minHeight="50dp"
         android:orientation="horizontal"
         android:paddingStart="12dp"
-        android:paddingTop="8dp"
+        android:paddingTop="5dp"
         android:paddingEnd="14dp"
-        android:paddingBottom="8dp">
+        android:paddingBottom="5dp">
 
         <View
             android:id="@+id/layout_indicator"
             android:layout_width="4dp"
-            android:layout_height="32dp"
+            android:layout_height="28dp"
             android:layout_marginEnd="12dp"
             android:background="@android:color/transparent" />
 
@@ -45,7 +45,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/md_theme_onSurface"
-            android:textSize="16sp"
+            android:textSize="15sp"
             tools:text="Server name" />
 
         <TextView

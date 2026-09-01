@@ -1,5 +1,6 @@
 package com.v2ray.ang.ui
 
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.net.Uri
@@ -45,7 +46,6 @@ import java.net.URI
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 class MainActivity : HelperBaseActivity() {
@@ -56,6 +56,8 @@ class MainActivity : HelperBaseActivity() {
     val mainViewModel: MainViewModel by viewModels()
     private lateinit var groupPagerAdapter: GroupPagerAdapter
     private lateinit var accountDashboardAdapter: AccountDashboardAdapter
+    private var accountDrawerExpanded = false
+    private var accountDrawerAnimator: ValueAnimator? = null
     private val pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
         override fun onPageSelected(position: Int) {
             val accountId = groupPagerAdapter.groups.getOrNull(position)?.id ?: return
@@ -88,7 +90,7 @@ class MainActivity : HelperBaseActivity() {
         setContentView(binding.root)
         setupTopBar()
 
-        // The server pages stay lightweight; the account rail is a separate dashboard view.
+        // The server pages stay lightweight; account controls live in a compact sliding drawer.
         groupPagerAdapter = GroupPagerAdapter(this, emptyList())
         binding.viewPager.adapter = groupPagerAdapter
         binding.viewPager.isUserInputEnabled = true
@@ -105,12 +107,14 @@ class MainActivity : HelperBaseActivity() {
                 } else {
                     binding.viewPager.setCurrentItem(position, true)
                 }
+                collapseAccountDrawer()
             },
-            onTelegramSelected = { url -> Utils.openUri(this, url) },
+            onShareSelected = ::shareAccount,
+            onDeleteSelected = ::confirmDeleteAccount,
         )
         binding.accountRecycler.layoutManager = LinearLayoutManager(
             this,
-            LinearLayoutManager.HORIZONTAL,
+            LinearLayoutManager.VERTICAL,
             false,
         )
         binding.accountRecycler.setHasFixedSize(true)
@@ -131,9 +135,9 @@ class MainActivity : HelperBaseActivity() {
     }
 
     private fun setupTopBar() {
-        binding.headerAccountsAction.contentDescription = getString(R.string.title_account_setting)
+        binding.headerAccountsAction.contentDescription = getString(R.string.simple_open_accounts)
         binding.headerAccountsAction.setOnClickListener {
-            requestActivityLauncher.launch(Intent(this, SubSettingActivity::class.java))
+            setAccountDrawerExpanded(!accountDrawerExpanded)
         }
         binding.buttonSettings.setOnClickListener {
             requestActivityLauncher.launch(Intent(this, SettingsActivity::class.java))
@@ -178,7 +182,7 @@ class MainActivity : HelperBaseActivity() {
         }
 
         binding.accountRecycler.isVisible = groups.isNotEmpty()
-        binding.accountEmptyCard.isVisible = groups.isEmpty()
+        binding.accountDrawerEmpty.isVisible = groups.isEmpty()
         refreshGroupTabTitles(true)
         if (targetIndex >= 0) {
             binding.accountRecycler.scrollToPosition(targetIndex)
@@ -190,26 +194,17 @@ class MainActivity : HelperBaseActivity() {
         subscription: SubscriptionItem,
     ): AccountDashboardItem {
         val metadata = subscription.panelMetadata
-        val details = buildList {
-            metadata?.user?.takeIf { it.isNotBlank() }?.let {
-                add(getString(R.string.simple_panel_user, it))
-            }
-            metadata?.startsOn?.takeIf { it.isNotBlank() }?.let {
-                add(getString(R.string.simple_starts_on, displayDateValue(it)))
-            }
-            metadata?.let(::displayExpiryDate)?.let {
-                add(getString(R.string.simple_expires_on, it))
-            }
-            if (isEmpty()) add(getString(R.string.simple_account_details_unavailable))
-        }.joinToString(" • ")
+        val workspace = metadata?.workspace
+            ?.takeIf { it.isNotBlank() }
+            ?: subscription.remarks.ifBlank { getString(R.string.simple_default_account_name) }
+        val user = metadata?.user
+            ?.takeIf { it.isNotBlank() }
+            ?: workspace
 
         return AccountDashboardItem(
             id = accountId,
-            title = metadata?.workspace
-                ?.takeIf { it.isNotBlank() }
-                ?: subscription.remarks.ifBlank { getString(R.string.simple_default_account_name) },
-            details = details,
-            telegramUrl = metadata?.telegramUrl?.takeIf { it.isNotBlank() },
+            user = user,
+            workspace = workspace,
         )
     }
 
@@ -252,22 +247,6 @@ class MainActivity : HelperBaseActivity() {
         }
     }
 
-    private fun displayExpiryDate(metadata: PanelSubscriptionMetadata): String? {
-        metadata.expiresAt?.takeIf { it.isNotBlank() }?.let { raw ->
-            if (raw.toLongOrNull() == null) return displayDateValue(raw)
-        }
-        val expiry = metadata.expireEpochSeconds ?: return null
-        return Instant.ofEpochSecond(expiry)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-            .format(DateTimeFormatter.ISO_LOCAL_DATE)
-    }
-
-    private fun displayDateValue(value: String): String {
-        val datePrefix = value.take(10)
-        return if (datePrefix.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) datePrefix else value
-    }
-
     @Suppress("UNUSED_PARAMETER")
     fun refreshGroupTabTitles(refreshAll: Boolean = false) {
         val subscriptions = MmkvManager.decodeSubscriptions()
@@ -279,13 +258,8 @@ class MainActivity : HelperBaseActivity() {
         }
 
         accountDashboardAdapter.submitItems(accountItems, selectedId)
-        binding.tvAccountsTitle.text = resources.getQuantityString(
-            R.plurals.simple_account_count,
-            subscriptions.size,
-            subscriptions.size,
-        )
         binding.accountRecycler.isVisible = subscriptions.isNotEmpty()
-        binding.accountEmptyCard.isVisible = subscriptions.isEmpty()
+        binding.accountDrawerEmpty.isVisible = subscriptions.isEmpty()
         showSelectedAccount(selectedId)
     }
 
@@ -305,6 +279,16 @@ class MainActivity : HelperBaseActivity() {
             else -> getString(R.string.simple_status_unknown)
         }
         val color = ContextCompat.getColor(this, statusColor(rawStatus))
+        val workspace = metadata?.workspace
+            ?.takeIf { it.isNotBlank() }
+            ?: subscription?.remarks?.takeIf { it.isNotBlank() }
+        val user = metadata?.user
+            ?.takeIf { it.isNotBlank() }
+            ?: workspace
+            ?: getString(R.string.simple_accounts)
+        val telegramUrl = metadata?.telegramUrl?.takeIf { it.isNotBlank() }
+
+        binding.tvAccountsTitle.text = user
         binding.accountStatusDot.backgroundTintList = ColorStateList.valueOf(color)
         binding.tvAccountStatus.text = getString(R.string.simple_status_value, status)
         binding.tvAccountRemaining.text = metadata?.let(::formatRemainingTime)
@@ -314,6 +298,12 @@ class MainActivity : HelperBaseActivity() {
             accountExpiryProgress(subscription),
             true,
         )
+        binding.tvWorkspaceName.text = workspace ?: getString(R.string.simple_value_unavailable)
+        binding.buttonTelegramChannel.isVisible = telegramUrl != null
+        binding.buttonTelegramChannel.text = telegramUrl?.let(::telegramLabel).orEmpty()
+        binding.buttonTelegramChannel.setOnClickListener(
+            telegramUrl?.let { url -> View.OnClickListener { Utils.openUri(this, url) } },
+        )
 
         val count = accountId?.let { MmkvManager.decodeServerList(it).size } ?: 0
         binding.tvSelectedServerCount.text = resources.getQuantityString(
@@ -321,6 +311,64 @@ class MainActivity : HelperBaseActivity() {
             count,
             count,
         )
+    }
+
+    private fun telegramLabel(url: String): String = url
+        .removePrefix("https://")
+        .removePrefix("http://")
+        .removeSuffix("/")
+
+    private fun setAccountDrawerExpanded(expanded: Boolean) {
+        accountDrawerExpanded = expanded
+        accountDrawerAnimator?.cancel()
+        val targetHeight = if (expanded) resources.displayMetrics.heightPixels / 3 else 0
+        accountDrawerAnimator = ValueAnimator.ofInt(binding.accountDrawerCard.height, targetHeight).apply {
+            duration = ACCOUNT_DRAWER_ANIMATION_MILLIS
+            addUpdateListener { animation ->
+                binding.accountDrawerCard.layoutParams = binding.accountDrawerCard.layoutParams.apply {
+                    height = animation.animatedValue as Int
+                }
+            }
+            start()
+        }
+        binding.accountExpandIcon.animate()
+            .rotation(if (expanded) 180f else 0f)
+            .setDuration(ACCOUNT_DRAWER_ANIMATION_MILLIS)
+            .start()
+        binding.headerAccountsAction.contentDescription = getString(
+            if (expanded) R.string.simple_close_accounts else R.string.simple_open_accounts,
+        )
+    }
+
+    private fun collapseAccountDrawer() {
+        if (accountDrawerExpanded) setAccountDrawerExpanded(false)
+    }
+
+    private fun shareAccount(accountId: String) {
+        val subscriptionUrl = MmkvManager.decodeSubscription(accountId)?.url
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, subscriptionUrl)
+        }
+        startActivity(Intent.createChooser(shareIntent, getString(R.string.simple_share_account)))
+    }
+
+    private fun confirmDeleteAccount(accountId: String) {
+        val subscription = MmkvManager.decodeSubscription(accountId) ?: return
+        val accountName = subscription.panelMetadata?.user
+            ?.takeIf { it.isNotBlank() }
+            ?: subscription.remarks
+        AlertDialog.Builder(this)
+            .setMessage(getString(R.string.simple_delete_account_confirm, accountName))
+            .setPositiveButton(R.string.simple_delete_account) { _, _ ->
+                SettingsManager.removeSubscriptionWithDefault(accountId)
+                setupGroupTab()
+                SubscriptionUpdater.sync(forceReschedule = true)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun accountExpiryProgress(subscription: SubscriptionItem?): Int {
@@ -957,6 +1005,7 @@ class MainActivity : HelperBaseActivity() {
 
 
     override fun onDestroy() {
+        accountDrawerAnimator?.cancel()
         binding.viewPager.unregisterOnPageChangeCallback(pageChangeCallback)
         super.onDestroy()
     }
@@ -968,5 +1017,6 @@ class MainActivity : HelperBaseActivity() {
         private const val SECONDS_PER_HOUR = 60L * 60L
         private const val SECONDS_PER_DAY = 24L * SECONDS_PER_HOUR
         private const val EPOCH_MILLISECONDS_THRESHOLD = 10_000_000_000L
+        private const val ACCOUNT_DRAWER_ANIMATION_MILLIS = 220L
     }
 }
