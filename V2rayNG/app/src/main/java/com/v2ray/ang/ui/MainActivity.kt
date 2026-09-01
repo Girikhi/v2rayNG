@@ -43,10 +43,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
+import kotlin.math.ceil
 
 class MainActivity : HelperBaseActivity() {
     private val binding by lazy {
@@ -88,6 +87,10 @@ class MainActivity : HelperBaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
+        binding.accountDrawerCard.layoutParams = binding.accountDrawerCard.layoutParams.apply {
+            width = 0
+            height = resources.displayMetrics.heightPixels / 3
+        }
         setupTopBar()
 
         // The server pages stay lightweight; account controls live in a compact sliding drawer.
@@ -215,38 +218,6 @@ class MainActivity : HelperBaseActivity() {
         else -> R.color.color_fab_inactive
     }
 
-    private fun formatRemainingTime(metadata: PanelSubscriptionMetadata): String? {
-        metadata.expiresAt
-            ?.take(10)
-            ?.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
-            ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-            ?.let { expiryDate ->
-                return when (val days = ChronoUnit.DAYS.between(LocalDate.now(), expiryDate)) {
-                    in Long.MIN_VALUE..-1L -> getString(R.string.simple_expired)
-                    0L -> getString(R.string.simple_today)
-                    else -> resources.getQuantityString(
-                        R.plurals.simple_days_short,
-                        days.toInt(),
-                        days,
-                    )
-                }
-            }
-
-        val expiry = metadata.expireEpochSeconds ?: return null
-        val seconds = expiry - Instant.now().epochSecond
-        if (seconds <= 0L) return getString(R.string.simple_expired)
-        val days = seconds / SECONDS_PER_DAY
-        if (days > 0L) {
-            return resources.getQuantityString(R.plurals.simple_days_short, days.toInt(), days)
-        }
-        val hours = seconds / SECONDS_PER_HOUR
-        return if (hours > 0L) {
-            resources.getQuantityString(R.plurals.simple_hours_short, hours.toInt(), hours)
-        } else {
-            getString(R.string.simple_less_than_one_hour_short)
-        }
-    }
-
     @Suppress("UNUSED_PARAMETER")
     fun refreshGroupTabTitles(refreshAll: Boolean = false) {
         val subscriptions = MmkvManager.decodeSubscriptions()
@@ -291,8 +262,7 @@ class MainActivity : HelperBaseActivity() {
         binding.tvAccountsTitle.text = user
         binding.accountStatusDot.backgroundTintList = ColorStateList.valueOf(color)
         binding.tvAccountStatus.text = getString(R.string.simple_status_value, status)
-        binding.tvAccountRemaining.text = metadata?.let(::formatRemainingTime)
-            ?: getString(R.string.simple_value_unavailable)
+        binding.tvAccountRemaining.text = formatAccountDays(subscription)
         binding.accountExpiryProgress.setIndicatorColor(color)
         binding.accountExpiryProgress.setProgressCompat(
             accountExpiryProgress(subscription),
@@ -321,18 +291,23 @@ class MainActivity : HelperBaseActivity() {
     private fun setAccountDrawerExpanded(expanded: Boolean) {
         accountDrawerExpanded = expanded
         accountDrawerAnimator?.cancel()
-        val targetHeight = if (expanded) resources.displayMetrics.heightPixels / 3 else 0
-        accountDrawerAnimator = ValueAnimator.ofInt(binding.accountDrawerCard.height, targetHeight).apply {
+        val horizontalMargins = (ACCOUNT_DRAWER_HORIZONTAL_MARGIN_DP * resources.displayMetrics.density).toInt()
+        val targetWidth = if (expanded) {
+            resources.displayMetrics.widthPixels - horizontalMargins
+        } else {
+            0
+        }
+        accountDrawerAnimator = ValueAnimator.ofInt(binding.accountDrawerCard.width, targetWidth).apply {
             duration = ACCOUNT_DRAWER_ANIMATION_MILLIS
             addUpdateListener { animation ->
                 binding.accountDrawerCard.layoutParams = binding.accountDrawerCard.layoutParams.apply {
-                    height = animation.animatedValue as Int
+                    width = animation.animatedValue as Int
                 }
             }
             start()
         }
         binding.accountExpandIcon.animate()
-            .rotation(if (expanded) 180f else 0f)
+            .rotation(if (expanded) 90f else -90f)
             .setDuration(ACCOUNT_DRAWER_ANIMATION_MILLIS)
             .start()
         binding.headerAccountsAction.contentDescription = getString(
@@ -383,6 +358,29 @@ class MainActivity : HelperBaseActivity() {
         return (((expiry - System.currentTimeMillis()).toDouble() / duration) * 100)
             .toInt()
             .coerceIn(0, 100)
+    }
+
+    private fun formatAccountDays(subscription: SubscriptionItem?): String {
+        val metadata = subscription?.panelMetadata
+            ?: return getString(R.string.simple_days_ratio, DASH_VALUE, DASH_VALUE)
+        val expiry = metadataExpiryMillis(metadata)
+            ?: return getString(R.string.simple_days_ratio, DASH_VALUE, DASH_VALUE)
+        val start = metadataStartMillis(metadata)
+        val now = System.currentTimeMillis()
+        val remainingFrom = start?.let { maxOf(now, it) } ?: now
+        val remainingDays = durationDays(remainingFrom, expiry)
+        val totalDays = start?.let { durationDays(it, expiry) }
+        return getString(
+            R.string.simple_days_ratio,
+            remainingDays.toString(),
+            totalDays?.toString() ?: DASH_VALUE,
+        )
+    }
+
+    private fun durationDays(fromMillis: Long, toMillis: Long): Long {
+        val duration = toMillis - fromMillis
+        if (duration <= 0L) return 0L
+        return ceil(duration / MILLIS_PER_DAY.toDouble()).toLong()
     }
 
     private fun metadataExpiryMillis(metadata: PanelSubscriptionMetadata): Long? {
@@ -1014,9 +1012,10 @@ class MainActivity : HelperBaseActivity() {
         private const val ADD_FROM_CLIPBOARD = 1
         private const val ADD_FROM_QR_CODE = 2
         private const val MAX_SUBSCRIPTION_NAME_LENGTH = 80
-        private const val SECONDS_PER_HOUR = 60L * 60L
-        private const val SECONDS_PER_DAY = 24L * SECONDS_PER_HOUR
+        private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
         private const val EPOCH_MILLISECONDS_THRESHOLD = 10_000_000_000L
         private const val ACCOUNT_DRAWER_ANIMATION_MILLIS = 220L
+        private const val ACCOUNT_DRAWER_HORIZONTAL_MARGIN_DP = 28
+        private const val DASH_VALUE = "—"
     }
 }

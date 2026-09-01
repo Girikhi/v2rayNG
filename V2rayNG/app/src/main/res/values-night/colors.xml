@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="colorPing">#35C98E</color>
+    <color name="colorPingRed">#FF5CAE</color>
     <color name="color_fab_active">#f97910</color>
     <color name="color_fab_inactive">#646464</color>
     <color name="divider_color_light">#424242</color>
+    <color name="simple_background">@color/md_theme_background</color>
+    <color name="simple_surface">@color/md_theme_surface</color>
 
     <!-- Primary colors - main tone: gray -->
     <color name="md_theme_primary">#C0C0C0</color>

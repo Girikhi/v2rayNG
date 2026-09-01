@@ -357,6 +357,7 @@
     <string name="simple_status">Status</string>
     <string name="simple_status_value">Status · %1$s</string>
     <string name="simple_status_no_account">No account</string>
+    <string name="simple_days_ratio">%1$s / %2$s days</string>
     <string name="simple_today">Today</string>
     <string name="simple_less_than_one_hour_short">&lt;1 hour</string>
     <plurals name="simple_days_short">
