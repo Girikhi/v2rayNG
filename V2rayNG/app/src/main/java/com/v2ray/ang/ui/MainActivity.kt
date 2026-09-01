@@ -23,6 +23,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.databinding.ActivityMainBinding
+import com.v2ray.ang.dto.ServerHealthPhase
 import com.v2ray.ang.dto.entities.PanelSubscriptionMetadata
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.dto.entities.SubscriptionItem
@@ -132,6 +133,10 @@ class MainActivity : HelperBaseActivity() {
         setupViewModel()
         SubscriptionUpdater.sync()
         mainViewModel.reloadServerList()
+        lifecycleScope.launch {
+            delay(650L)
+            mainViewModel.startStartupHealthCheck()
+        }
 
         checkAndRequestPermission(PermissionType.POST_NOTIFICATIONS) {
         }
@@ -157,6 +162,19 @@ class MainActivity : HelperBaseActivity() {
             binding.buttonPing.text = getString(
                 if (isTesting) R.string.simple_testing else R.string.simple_ping
             )
+        }
+        mainViewModel.serverHealthState.observe(this) { state ->
+            if (state.subscriptionId != mainViewModel.subscriptionId) {
+                return@observe
+            }
+            if (state.phase == ServerHealthPhase.READY ||
+                state.phase == ServerHealthPhase.NO_WORKING_SERVERS
+            ) {
+                refreshGroupTabTitles(true)
+            }
+            if (mainViewModel.isRunning.value != true) {
+                applyRunningState(isLoading = false, isRunning = false)
+            }
         }
         mainViewModel.startListenBroadcast()
         mainViewModel.initAssets(assets)
@@ -275,7 +293,7 @@ class MainActivity : HelperBaseActivity() {
             telegramUrl?.let { url -> View.OnClickListener { Utils.openUri(this, url) } },
         )
 
-        val count = accountId?.let { MmkvManager.decodeServerList(it).size } ?: 0
+        val count = accountId?.let(mainViewModel::getVisibleServerCount) ?: 0
         binding.tvSelectedServerCount.text = resources.getQuantityString(
             R.plurals.simple_server_count,
             count,
@@ -527,6 +545,7 @@ class MainActivity : HelperBaseActivity() {
                                 updateResult.configCount
                             )
                         )
+                        mainViewModel.startStartupHealthCheck(force = true)
                     } else {
                         toastError(R.string.simple_subscription_update_failed)
                     }
@@ -566,6 +585,7 @@ class MainActivity : HelperBaseActivity() {
         }
 
         if (isRunning) {
+            binding.fab.isEnabled = true
             binding.fab.setImageResource(R.drawable.ic_stop_24dp)
             binding.fab.backgroundTintList = ColorStateList.valueOf(
                 ContextCompat.getColor(this, R.color.color_fab_active)
@@ -578,7 +598,41 @@ class MainActivity : HelperBaseActivity() {
                 ContextCompat.getColor(this, R.color.color_fab_inactive)
             )
             binding.fab.contentDescription = getString(R.string.tasker_start_service)
-            setTestState(getString(R.string.simple_tap_to_connect))
+            val healthState = mainViewModel.serverHealthState.value
+                ?.takeIf { it.subscriptionId == mainViewModel.subscriptionId }
+            when (healthState?.phase) {
+                ServerHealthPhase.CHECKING -> {
+                    binding.fab.isEnabled = false
+                    setTestState(getString(R.string.simple_checking_servers))
+                }
+                ServerHealthPhase.REFRESHING -> {
+                    binding.fab.isEnabled = false
+                    setTestState(getString(R.string.simple_refreshing_account_configs))
+                }
+                ServerHealthPhase.READY -> {
+                    binding.fab.isEnabled = true
+                    setTestState(
+                        getString(R.string.simple_servers_ready, healthState.workingCount)
+                    )
+                }
+                ServerHealthPhase.NO_WORKING_SERVERS -> {
+                    binding.fab.isEnabled = false
+                    setTestState(getString(R.string.simple_no_working_servers))
+                }
+                null -> {
+                    binding.fab.isEnabled = true
+                    setTestState(getString(R.string.simple_tap_to_connect))
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        lifecycleScope.launch {
+            delay(250L)
+            mainViewModel.startStartupHealthCheck(force = true)
         }
     }
 

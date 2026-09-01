@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.AssetManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
@@ -14,6 +16,8 @@ import com.v2ray.ang.AngApplication
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.dto.GroupMapItem
+import com.v2ray.ang.dto.ServerHealthPhase
+import com.v2ray.ang.dto.ServerHealthState
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.TestServiceMessage
 import com.v2ray.ang.dto.entities.ServersCache
@@ -25,6 +29,7 @@ import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
@@ -32,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import java.util.regex.PatternSyntaxException
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -44,6 +50,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isTesting by lazy { MutableLiveData<Boolean>(false) }
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
+    val serverHealthState by lazy { MutableLiveData<ServerHealthState>() }
+
+    private val healthFilteredSubscriptions = ConcurrentHashMap.newKeySet<String>()
+    private var activePingBatch: PingBatch? = null
+    private var startupHealthCheckStarted = false
+    private var startupRefreshAttempted = false
+
+    private data class PingBatch(
+        val subscriptionId: String,
+        val serverGuids: List<String>,
+        val allowAutomaticRefresh: Boolean,
+        val isAfterRefresh: Boolean,
+    )
 
     /**
      * Refer to the official documentation for [registerReceiver](https://developer.android.com/reference/androidx/core/content/ContextCompat#registerReceiver(android.content.Context,android.content.BroadcastReceiver,android.content.IntentFilter,int):
@@ -124,6 +143,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         for (guid in serverList) {
             val profile = MmkvManager.decodeServerConfig(guid) ?: continue
+            val shouldHideFailed = subscriptionId in healthFilteredSubscriptions
+            val testDelay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L
+            if (shouldHideFailed && testDelay < 0L) {
+                continue
+            }
             if (kw.isEmpty()) {
                 serversCache.add(ServersCache(guid, profile))
                 continue
@@ -180,25 +204,85 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Tests the real ping for all servers.
      */
     fun testAllRealPing() {
+        startRealPing(
+            targetSubscriptionId = subscriptionId,
+            allowAutomaticRefresh = false,
+            isAfterRefresh = false,
+        )
+    }
+
+    /**
+     * Runs one guarded health check when the app opens. A forced check is used when the
+     * launcher brings the existing single-task activity to the foreground again.
+     */
+    fun startStartupHealthCheck(force: Boolean = false) {
+        if (isTesting.value == true) {
+            return
+        }
+        if (startupHealthCheckStarted && !force) {
+            return
+        }
+
+        val targetSubscriptionId = subscriptionId
+        if (targetSubscriptionId.isEmpty()) {
+            startupHealthCheckStarted = true
+            return
+        }
+
+        startupHealthCheckStarted = true
+        startupRefreshAttempted = false
+        startRealPing(
+            targetSubscriptionId = targetSubscriptionId,
+            allowAutomaticRefresh = true,
+            isAfterRefresh = false,
+        )
+    }
+
+    private fun startRealPing(
+        targetSubscriptionId: String,
+        allowAutomaticRefresh: Boolean,
+        isAfterRefresh: Boolean,
+    ) {
         MessageUtil.sendMsg2TestService(
             getApplication(),
             TestServiceMessage(key = AppConfig.MSG_MEASURE_CONFIG_CANCEL)
         )
-        MmkvManager.clearAllTestDelayResults(serversCache.map { it.guid }.toList())
-        updateListAction.value = -1
+
+        val testGuids = if (targetSubscriptionId.isEmpty()) {
+            MmkvManager.decodeAllServerList()
+        } else {
+            MmkvManager.decodeServerList(targetSubscriptionId)
+        }.distinct()
+
+        activePingBatch = PingBatch(
+            subscriptionId = targetSubscriptionId,
+            serverGuids = testGuids,
+            allowAutomaticRefresh = allowAutomaticRefresh,
+            isAfterRefresh = isAfterRefresh,
+        )
+        healthFilteredSubscriptions.remove(targetSubscriptionId)
+        MmkvManager.clearAllTestDelayResults(testGuids)
+        if (subscriptionId == targetSubscriptionId) {
+            reloadServerList()
+        }
+        isTesting.value = true
+        serverHealthState.value = ServerHealthState(
+            subscriptionId = targetSubscriptionId,
+            phase = ServerHealthPhase.CHECKING,
+            totalCount = testGuids.size,
+        )
 
         viewModelScope.launch(Dispatchers.Default) {
-            if (serversCache.isEmpty()) {
-                isTesting.postValue(false)
+            if (testGuids.isEmpty()) {
+                onTestsFinished()
                 return@launch
             }
-            isTesting.postValue(true)
             MessageUtil.sendMsg2TestService(
                 getApplication(),
                 TestServiceMessage(
                     key = AppConfig.MSG_MEASURE_CONFIG_START,
-                    subscriptionId = subscriptionId,
-                    serverGuids = if (keywordFilter.isNotEmpty()) serversCache.map { it.guid } else emptyList()
+                    subscriptionId = targetSubscriptionId,
+                    serverGuids = testGuids,
                 )
             )
         }
@@ -239,6 +323,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 id = sub.guid,
                 remarks = sub.subscription.remarks,
             )
+        }
+    }
+
+    fun getVisibleServerCount(subscriptionId: String): Int {
+        val serverGuids = MmkvManager.decodeServerList(subscriptionId)
+        if (subscriptionId !in healthFilteredSubscriptions) {
+            return serverGuids.size
+        }
+        return serverGuids.count { guid ->
+            (MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L) >= 0L
         }
     }
 
@@ -400,20 +494,149 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onTestsFinished() {
+        val batch = activePingBatch
+        activePingBatch = null
+
         viewModelScope.launch(Dispatchers.Default) {
+            if (batch == null) {
+                withContext(Dispatchers.Main) {
+                    reloadServerList()
+                    isTesting.value = false
+                }
+                return@launch
+            }
+
+            // A worker exception may leave a cleared result at zero. Once the batch is over,
+            // every non-positive result is a confirmed failure and can be hidden consistently.
+            batch.serverGuids.forEach { guid ->
+                val delay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L
+                if (delay <= 0L) {
+                    MmkvManager.encodeServerTestDelayMillis(guid, -1L)
+                }
+            }
+
             if (MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_REMOVE_INVALID_AFTER_TEST)) {
                 removeInvalidServer()
             }
 
             if (MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_SORT_AFTER_TEST)) {
-                sortByTestResults()
+                if (batch.subscriptionId.isNotEmpty()) {
+                    sortByTestResultsForSub(batch.subscriptionId)
+                } else {
+                    sortByTestResults()
+                }
+            }
+
+            val orderedGuids = if (batch.subscriptionId.isEmpty()) {
+                batch.serverGuids
+            } else {
+                MmkvManager.decodeServerList(batch.subscriptionId)
+            }
+            val workingGuids = orderedGuids.filter { guid ->
+                (MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L) > 0L
+            }
+            if (batch.subscriptionId.isNotEmpty()) {
+                healthFilteredSubscriptions.add(batch.subscriptionId)
+            }
+
+            if (workingGuids.isNotEmpty()) {
+                if (subscriptionId == batch.subscriptionId) {
+                    MmkvManager.setSelectServer(workingGuids.first())
+                }
+                withContext(Dispatchers.Main) {
+                    if (subscriptionId == batch.subscriptionId) {
+                        reloadServerList()
+                    }
+                    serverHealthState.value = ServerHealthState(
+                        subscriptionId = batch.subscriptionId,
+                        phase = ServerHealthPhase.READY,
+                        workingCount = workingGuids.size,
+                        totalCount = batch.serverGuids.size,
+                    )
+                    isTesting.value = false
+                }
+                return@launch
+            }
+
+            val shouldRefresh = batch.allowAutomaticRefresh &&
+                !batch.isAfterRefresh &&
+                !startupRefreshAttempted &&
+                isActiveUnexpiredAccount(batch.subscriptionId) &&
+                hasInternetNetwork()
+
+            if (shouldRefresh) {
+                startupRefreshAttempted = true
+                serverHealthState.postValue(
+                    ServerHealthState(
+                        subscriptionId = batch.subscriptionId,
+                        phase = ServerHealthPhase.REFRESHING,
+                        totalCount = batch.serverGuids.size,
+                    )
+                )
+                val refreshed = refreshSubscription(batch.subscriptionId)
+                if (refreshed) {
+                    healthFilteredSubscriptions.remove(batch.subscriptionId)
+                    withContext(Dispatchers.Main) {
+                        if (subscriptionId == batch.subscriptionId) {
+                            reloadServerList()
+                        }
+                        startRealPing(
+                            targetSubscriptionId = batch.subscriptionId,
+                            allowAutomaticRefresh = false,
+                            isAfterRefresh = true,
+                        )
+                    }
+                    return@launch
+                }
             }
 
             withContext(Dispatchers.Main) {
-                reloadServerList()
+                if (subscriptionId == batch.subscriptionId) {
+                    MmkvManager.setSelectServer("")
+                    reloadServerList()
+                }
+                serverHealthState.value = ServerHealthState(
+                    subscriptionId = batch.subscriptionId,
+                    phase = ServerHealthPhase.NO_WORKING_SERVERS,
+                    totalCount = batch.serverGuids.size,
+                )
                 isTesting.value = false
             }
         }
+    }
+
+    private fun isActiveUnexpiredAccount(subscriptionId: String): Boolean {
+        val metadata = MmkvManager.decodeSubscription(subscriptionId)?.panelMetadata ?: return false
+        if (!metadata.status.equals("active", ignoreCase = true)) {
+            return false
+        }
+        val expiresAtMillis = metadata.expireEpochSeconds?.times(1000L) ?: return false
+        return expiresAtMillis > System.currentTimeMillis()
+    }
+
+    /**
+     * Checks the device network directly without relying on Google's validation endpoint,
+     * which can report false negatives on restricted networks.
+     */
+    private fun hasInternetNetwork(): Boolean {
+        val connectivityManager = getApplication<AngApplication>()
+            .getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return false
+        val activeNetwork = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    private suspend fun refreshSubscription(subscriptionId: String): Boolean {
+        val subscription = MmkvManager.decodeSubscription(subscriptionId) ?: return false
+        val result = withContext(Dispatchers.IO) {
+            AngConfigManager.updateConfigViaSub(SubscriptionCache(subscriptionId, subscription))
+        }
+        if (result.successCount <= 0 || result.configCount <= 0) {
+            return false
+        }
+        SubscriptionUpdater.syncOne(subId = subscriptionId)
+        return true
     }
 
     private val mMsgReceiver = object : BroadcastReceiver() {
@@ -462,6 +685,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (content == "0") {
                         onTestsFinished()
                     } else {
+                        activePingBatch = null
                         isTesting.value = false
                     }
                 }
