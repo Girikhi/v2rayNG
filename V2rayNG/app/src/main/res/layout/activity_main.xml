@@ -174,6 +174,11 @@
         app:iconPadding="6dp"
         app:iconTint="@color/md_theme_primary" />
 
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.28" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -226,13 +231,17 @@
                 android:layout_weight="1"
                 android:contentDescription="@string/simple_add"
                 android:minHeight="50dp"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
                 android:text="@string/simple_add"
                 android:textAllCaps="false"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 app:backgroundTint="@color/md_theme_primary"
                 app:cornerRadius="14dp"
                 app:icon="@drawable/ic_add_24dp"
-                app:iconPadding="4dp"
+                app:iconPadding="2dp"
+                app:iconSize="18dp"
                 app:iconTint="@color/md_theme_onPrimary" />
 
             <com.google.android.material.button.MaterialButton
@@ -244,14 +253,18 @@
                 android:layout_weight="1"
                 android:contentDescription="@string/simple_ping"
                 android:minHeight="50dp"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
                 android:text="@string/simple_ping"
                 android:textAllCaps="false"
                 android:textColor="@color/md_theme_onSecondaryContainer"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 app:backgroundTint="@color/md_theme_secondaryContainer"
                 app:cornerRadius="14dp"
                 app:icon="@drawable/ic_speed_24dp"
-                app:iconPadding="4dp"
+                app:iconPadding="2dp"
+                app:iconSize="18dp"
                 app:iconTint="@color/md_theme_onSecondaryContainer" />
 
             <com.google.android.material.button.MaterialButton
@@ -262,14 +275,18 @@
                 android:layout_weight="1"
                 android:contentDescription="@string/simple_refresh"
                 android:minHeight="50dp"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
                 android:text="@string/simple_refresh"
                 android:textAllCaps="false"
                 android:textColor="@color/md_theme_onSecondaryContainer"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 app:backgroundTint="@color/md_theme_secondaryContainer"
                 app:cornerRadius="14dp"
                 app:icon="@drawable/ic_refresh_24dp"
-                app:iconPadding="4dp"
+                app:iconPadding="2dp"
+                app:iconSize="18dp"
                 app:iconTint="@color/md_theme_onSecondaryContainer" />
 
         </LinearLayout>
@@ -307,7 +324,7 @@
         android:id="@+id/view_pager"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="0.72"
         android:scrollbars="vertical" />
 
     </LinearLayout>
