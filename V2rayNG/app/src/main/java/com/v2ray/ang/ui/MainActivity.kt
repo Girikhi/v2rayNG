@@ -28,6 +28,7 @@ import com.v2ray.ang.dto.entities.PanelSubscriptionMetadata
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.enums.EConfigType
+import com.v2ray.ang.enums.Language
 import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
@@ -143,6 +144,7 @@ class MainActivity : HelperBaseActivity() {
     }
 
     private fun setupTopBar() {
+        setupLanguageToggle()
         binding.headerAccountsAction.contentDescription = getString(R.string.simple_open_accounts)
         binding.headerAccountsAction.setOnClickListener {
             setAccountDrawerExpanded(!accountDrawerExpanded)
@@ -207,6 +209,22 @@ class MainActivity : HelperBaseActivity() {
         refreshGroupTabTitles(true)
         if (targetIndex >= 0) {
             binding.accountRecycler.scrollToPosition(targetIndex)
+        }
+    }
+
+    private fun setupLanguageToggle() {
+        val isPersian = SettingsManager.getLocale().language == Language.PERSIAN.code
+        binding.buttonLanguage.text = if (isPersian) "EN" else "فا"
+        binding.buttonLanguage.contentDescription = getString(
+            if (isPersian) R.string.simple_switch_to_english
+            else R.string.simple_switch_to_persian
+        )
+        binding.buttonLanguage.setOnClickListener {
+            MmkvManager.encodeSettings(
+                AppConfig.PREF_LANGUAGE,
+                if (isPersian) Language.ENGLISH.code else Language.PERSIAN.code,
+            )
+            recreate()
         }
     }
 

@@ -48,7 +48,10 @@ class MainRecyclerAdapter(
         val affiliation = MmkvManager.decodeServerAffiliationInfo(server.guid)
         val delayMillis = affiliation?.testDelayMillis ?: 0L
 
-        holder.binding.tvName.text = server.profile.remarks
+        holder.binding.tvName.text = context.getString(
+            R.string.simple_server_number,
+            position + 1,
+        )
         holder.binding.tvTestResult.text = when {
             delayMillis > 0L -> context.getString(R.string.server_test_delay_value, delayMillis)
             delayMillis < 0L -> context.getString(R.string.simple_ping_failed)

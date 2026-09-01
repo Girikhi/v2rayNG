@@ -331,6 +331,10 @@
     <string name="simple_connected">Connected</string>
     <string name="simple_not_tested">Not tested</string>
     <string name="simple_ping_failed">Failed</string>
+    <string name="simple_server_number">Server %1$d</string>
+    <string name="simple_language_english_short" translatable="false">EN</string>
+    <string name="simple_switch_to_english">Switch to English</string>
+    <string name="simple_switch_to_persian">Switch to Persian</string>
     <string name="simple_default_subscription_name">Subscription</string>
     <string name="simple_subscription_exists">This subscription has already been added.</string>
     <string name="simple_subscription_update_failed">Subscription saved, but profiles could not be downloaded.</string>

@@ -506,6 +506,7 @@ object SettingsManager {
      */
     private fun ensureDefaultSettings() {
         // Write defaults in the exact order requested by the user
+        ensureDefaultValue(AppConfig.PREF_LANGUAGE, Language.PERSIAN.code)
         ensureDefaultValue(AppConfig.PREF_MODE, VPN)
         ensureDefaultValue(AppConfig.PREF_VPN_DNS, AppConfig.DNS_VPN)
         ensureDefaultValue(AppConfig.PREF_VPN_MTU, AppConfig.VPN_MTU.toString())
