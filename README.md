@@ -2,8 +2,8 @@
 
 An account-first Android VPN client with a clean dashboard, automatic server health checks, and first-class support for subscription metadata.
 
-[![Release](https://img.shields.io/github/v/release/Girikhi/v2rayNG?display_name=tag&sort=semver)](https://github.com/Girikhi/v2rayNG/releases/latest)
-[![Build](https://github.com/Girikhi/v2rayNG/actions/workflows/build-custom-debug.yml/badge.svg?branch=codex%2Fv2.2.5-auto)](https://github.com/Girikhi/v2rayNG/actions/workflows/build-custom-debug.yml)
+[![Release](https://img.shields.io/github/v/release/Girikhi/v2rayNG-Auto?display_name=tag&sort=semver)](https://github.com/Girikhi/v2rayNG-Auto/releases/latest)
+[![Build](https://github.com/Girikhi/v2rayNG-Auto/actions/workflows/build-custom-debug.yml/badge.svg?branch=codex%2Fv2.2.5-auto)](https://github.com/Girikhi/v2rayNG-Auto/actions/workflows/build-custom-debug.yml)
 [![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com/about/versions/nougat)
 [![License](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
@@ -11,7 +11,7 @@ An account-first Android VPN client with a clean dashboard, automatic server hea
 
 ## Download
 
-Download the signed **universal APK** from the [latest GitHub release](https://github.com/Girikhi/v2rayNG/releases/latest).
+Download the signed **universal APK** from the [latest GitHub release](https://github.com/Girikhi/v2rayNG-Auto/releases/latest).
 
 The universal package supports:
 
@@ -21,6 +21,10 @@ The universal package supports:
 - `x86_64`
 
 Android 7.0 (API 24) or newer is required. When Android asks for permission, allow installation from the browser or file manager used to open the APK.
+
+### Play Protect and sideloading
+
+This APK is distributed through GitHub rather than Google Play. Play Protect may recommend scanning a newly downloaded release because it has not seen that exact APK or signing identity before. Keep Play Protect enabled, choose **Scan app**, and install only assets published on this repository's Releases page. A warning that explicitly identifies the app as harmful is different and should be reported with its exact message before installation.
 
 ## Highlights
 
@@ -86,7 +90,7 @@ The app enforces a minimum automatic refresh interval of 15 minutes. Existing me
 
 ## Building
 
-The canonical APK is built by [GitHub Actions](https://github.com/Girikhi/v2rayNG/actions/workflows/build-custom-debug.yml). The workflow:
+The canonical APK is built by [GitHub Actions](https://github.com/Girikhi/v2rayNG-Auto/actions/workflows/build-custom-debug.yml). The workflow:
 
 1. Builds the native tunnel libraries.
 2. Downloads the matching Xray core library.
