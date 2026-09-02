@@ -38,6 +38,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="@color/md_theme_onSurface"
+                android:textDirection="locale"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -49,6 +50,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="@color/md_theme_onSurfaceVariant"
+                android:textDirection="locale"
                 android:textSize="11sp" />
 
         </LinearLayout>

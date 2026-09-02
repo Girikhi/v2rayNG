@@ -45,6 +45,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
+import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.ceil
@@ -408,10 +409,13 @@ class MainActivity : HelperBaseActivity() {
         val totalDays = start?.let { durationDays(it, expiry) }
         return getString(
             R.string.simple_days_ratio,
-            remainingDays.toString(),
-            totalDays?.toString() ?: DASH_VALUE,
+            formatLocalizedNumber(remainingDays),
+            totalDays?.let(::formatLocalizedNumber) ?: DASH_VALUE,
         )
     }
+
+    private fun formatLocalizedNumber(value: Long): String =
+        NumberFormat.getIntegerInstance(SettingsManager.getLocale()).format(value)
 
     private fun durationDays(fromMillis: Long, toMillis: Long): Long {
         val duration = toMillis - fromMillis

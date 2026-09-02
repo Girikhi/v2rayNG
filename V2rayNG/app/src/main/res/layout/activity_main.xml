@@ -118,9 +118,10 @@
             android:layout_width="0dp"
             android:layout_height="30dp"
             android:layout_weight="1"
-            android:gravity="center_vertical"
+            android:gravity="start|center_vertical"
             android:text="@string/simple_status"
             android:textColor="@color/md_theme_onSurfaceVariant"
+            android:textDirection="locale"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -128,10 +129,11 @@
             android:id="@+id/tv_account_remaining"
             android:layout_width="wrap_content"
             android:layout_height="30dp"
-            android:gravity="center_vertical"
+            android:gravity="end|center_vertical"
             android:maxLines="1"
             android:text="@string/simple_value_unavailable"
             android:textColor="@color/md_theme_onSurface"
+            android:textDirection="locale"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -174,6 +176,7 @@
             android:paddingEnd="16dp"
             android:text="@string/simple_value_unavailable"
             android:textColor="@color/md_theme_onSurface"
+            android:textDirection="locale"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -230,6 +233,7 @@
                 android:maxLines="2"
                 android:text="@string/simple_tap_to_connect"
                 android:textColor="@color/md_theme_onBackground"
+                android:textDirection="locale"
                 android:textSize="17sp"
                 android:textStyle="bold" />
 
@@ -350,6 +354,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@color/md_theme_onSurfaceVariant"
+            android:textDirection="locale"
             android:textSize="12sp" />
 
     </LinearLayout>
