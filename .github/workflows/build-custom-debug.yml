@@ -1,4 +1,4 @@
-name: Build v2rayNg Auto v2.2.5 APK
+name: Build v2rayNG Auto v1.0.1 APK
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build optimized v2.2.5 universal APK
+    name: Build signed v1.0.1 universal APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -76,7 +76,7 @@ jobs:
             --pattern libv2ray.aar \
             --dir V2rayNG/app/libs
 
-      - name: Build optimized F-Droid APK
+      - name: Build signed F-Droid release APK
         working-directory: V2rayNG
         env:
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/v2rayng-auto.p12
@@ -86,15 +86,16 @@ jobs:
         run: |
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
           chmod +x gradlew
-          ./gradlew assembleFdroidDebug --no-daemon --stacktrace
+          ./gradlew assembleFdroidRelease --no-daemon --stacktrace
 
       - name: Verify universal APK
         run: |
-          apk_path="$(find V2rayNG/app/build/outputs/apk/fdroid/debug -name '*_universal.apk' -print -quit)"
+          apk_path="$(find V2rayNG/app/build/outputs/apk/fdroid/release -name '*_universal.apk' -print -quit)"
           test -n "$apk_path"
           badging="$($ANDROID_HOME/build-tools/37.0.0/aapt2 dump badging "$apk_path")"
-          printf '%s\n' "$badging" | grep -F "versionName='2.2.5'"
-          printf '%s\n' "$badging" | grep -F "application-label:'v2rayNg Auto'"
+          printf '%s\n' "$badging" | grep -F "package: name='com.girikhi.v2rayng.auto'"
+          printf '%s\n' "$badging" | grep -F "versionName='1.0.1'"
+          printf '%s\n' "$badging" | grep -F "application-label:'v2rayNG Auto'"
           if printf '%s\n' "$badging" | grep -q "application-debuggable"; then
             echo "APK must not be debuggable" >&2
             exit 1
@@ -103,7 +104,7 @@ jobs:
       - name: Upload universal APK only
         uses: actions/upload-artifact@v7
         with:
-          name: v2rayNg-Auto-2.2.5-universal
-          path: V2rayNG/app/build/outputs/apk/fdroid/debug/*_universal.apk
+          name: v2rayNG-Auto-1.0.1-universal
+          path: V2rayNG/app/build/outputs/apk/fdroid/release/*_universal.apk
           if-no-files-found: error
           retention-days: 14

@@ -1,5 +1,9 @@
 # v2rayNG Auto
 
+<p align="center">
+  <img src="branding/v2rayng-auto-icon-v1-master.png" alt="v2rayNG Auto icon" width="180" />
+</p>
+
 An account-first Android VPN client with a clean dashboard, automatic server health checks, and first-class support for subscription metadata.
 
 [![Release](https://img.shields.io/github/v/release/Girikhi/v2rayNG-Auto?display_name=tag&sort=semver)](https://github.com/Girikhi/v2rayNG-Auto/releases/latest)
@@ -8,6 +12,8 @@ An account-first Android VPN client with a clean dashboard, automatic server hea
 [![License](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
 > **v2rayNG Auto V1.0** is an independent customized fork of [2dust/v2rayNG](https://github.com/2dust/v2rayNG), based on the fast v2rayNG 2.2.5 codebase. It is not an official 2dust release.
+
+Package ID: `com.girikhi.v2rayng.auto`
 
 ## Download
 
@@ -25,6 +31,8 @@ Android 7.0 (API 24) or newer is required. When Android asks for permission, all
 ### Play Protect and sideloading
 
 This APK is distributed through GitHub rather than Google Play. Play Protect may recommend scanning a newly downloaded release because it has not seen that exact APK or signing identity before. Keep Play Protect enabled, choose **Scan app**, and install only assets published on this repository's Releases page. A warning that explicitly identifies the app as harmful is different and should be reported with its exact message before installation.
+
+Versions installed with the former upstream package ID cannot be upgraded in place. Uninstall that version before installing v1.0.1 or newer; Android will treat v2rayNG Auto as a separate application.
 
 ## Highlights
 
@@ -94,7 +102,7 @@ The canonical APK is built by [GitHub Actions](https://github.com/Girikhi/v2rayN
 
 1. Builds the native tunnel libraries.
 2. Downloads the matching Xray core library.
-3. Builds the optimized F-Droid universal APK.
+3. Builds the signed F-Droid release universal APK.
 4. Signs the APK using repository secrets.
 5. Checks the app name, version, non-debuggable state, and universal package.
 6. Uploads only the universal APK artifact.
