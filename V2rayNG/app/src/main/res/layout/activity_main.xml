@@ -4,7 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/simple_background"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="true"
+    android:layoutDirection="locale">
 
     <LinearLayout
         android:id="@+id/main_content"
@@ -372,8 +373,8 @@
         android:id="@+id/account_drawer_card"
         android:layout_width="0dp"
         android:layout_height="220dp"
-        android:layout_gravity="start|top"
-        android:layout_marginStart="14dp"
+        android:layout_gravity="left|top"
+        android:layout_marginLeft="14dp"
         android:layout_marginTop="58dp"
         app:cardBackgroundColor="@color/simple_surface"
         app:cardCornerRadius="16dp"
