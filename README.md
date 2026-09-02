@@ -32,7 +32,7 @@ Android 7.0 (API 24) or newer is required. When Android asks for permission, all
 
 This APK is distributed through GitHub rather than Google Play. Play Protect may recommend scanning a newly downloaded release because it has not seen that exact APK or signing identity before. Keep Play Protect enabled, choose **Scan app**, and install only assets published on this repository's Releases page. A warning that explicitly identifies the app as harmful is different and should be reported with its exact message before installation.
 
-Versions installed with the former upstream package ID cannot be upgraded in place. Uninstall that version before installing v1.0.1 or newer; Android will treat v2rayNG Auto as a separate application.
+Versions installed with the former upstream package ID cannot be upgraded in place. Uninstall that version before installing the updated V1.0 release; Android will treat v2rayNG Auto as a separate application.
 
 ## Highlights
 

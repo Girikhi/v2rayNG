@@ -1,4 +1,4 @@
-name: Build v2rayNG Auto v1.0.1 APK
+name: Build v2rayNG Auto V1.0 APK
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build signed v1.0.1 universal APK
+    name: Build signed V1.0 universal APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -94,7 +94,7 @@ jobs:
           test -n "$apk_path"
           badging="$($ANDROID_HOME/build-tools/37.0.0/aapt2 dump badging "$apk_path")"
           printf '%s\n' "$badging" | grep -F "package: name='com.girikhi.v2rayng.auto'"
-          printf '%s\n' "$badging" | grep -F "versionName='1.0.1'"
+          printf '%s\n' "$badging" | grep -F "versionName='1.0'"
           printf '%s\n' "$badging" | grep -F "application-label:'v2rayNG Auto'"
           if printf '%s\n' "$badging" | grep -q "application-debuggable"; then
             echo "APK must not be debuggable" >&2
@@ -104,7 +104,7 @@ jobs:
       - name: Upload universal APK only
         uses: actions/upload-artifact@v7
         with:
-          name: v2rayNG-Auto-1.0.1-universal
+          name: v2rayNG-Auto-V1.0-universal
           path: V2rayNG/app/build/outputs/apk/fdroid/release/*_universal.apk
           if-no-files-found: error
           retention-days: 14
