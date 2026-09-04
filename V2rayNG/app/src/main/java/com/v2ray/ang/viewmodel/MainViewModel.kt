@@ -507,7 +507,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // A worker exception may leave a cleared result at zero. Once the batch is over,
-            // Every non-positive result is a failure; entries remain visible and optional sorting moves failures last.
+            // every non-positive result is a failure; entries remain visible and sorting moves failures last.
             batch.serverGuids.forEach { guid ->
                 val delay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L
                 if (delay <= 0L) {
@@ -515,14 +515,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            if (batch.subscriptionId == AppConfig.DEFAULT_SUBSCRIPTION_ID ||
-                MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_SORT_AFTER_TEST)
-            ) {
-                if (batch.subscriptionId.isNotEmpty()) {
-                    sortByTestResultsForSub(batch.subscriptionId)
-                } else {
-                    sortByTestResults()
-                }
+            if (batch.subscriptionId.isNotEmpty()) {
+                sortByTestResultsForSub(batch.subscriptionId)
+            } else {
+                sortByTestResults()
             }
 
             val orderedGuids = if (batch.subscriptionId.isEmpty()) {

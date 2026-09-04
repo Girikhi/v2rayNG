@@ -23,6 +23,45 @@ class SubscriptionMetadataManagerTest {
     }
 
     @Test
+    fun zeroTotalIsRetainedAsSupportedUnlimitedData() {
+        val subscription = SubscriptionItem()
+
+        SubscriptionMetadataManager.updateFromHeaders(subscription, mapOf(
+            "subscription-userinfo" to "upload=1024; download=2048; total=0",
+        ))
+
+        assertEquals(3072L, subscription.panelMetadata?.dataUsedBytes)
+        assertEquals(0L, subscription.panelMetadata?.dataLimitBytes)
+    }
+
+    @Test
+    fun superAdminUnlimitedModeIsShownEvenWithoutByteHeaders() {
+        val subscription = SubscriptionItem()
+
+        SubscriptionMetadataManager.updateFromHeaders(subscription, mapOf(
+            "X-Panel-Metadata-Version" to "2",
+            "X-Panel-Data-Limit" to "unlimited",
+            "subscription-userinfo" to "expire=1900000000",
+        ))
+
+        assertEquals(0L, subscription.panelMetadata?.dataLimitBytes)
+        assertNull(subscription.panelMetadata?.dataUsedBytes)
+    }
+
+    @Test
+    fun superAdminLimitedModeReadsItsExactByteHeader() {
+        val subscription = SubscriptionItem()
+
+        SubscriptionMetadataManager.updateFromHeaders(subscription, mapOf(
+            "X-Panel-Metadata-Version" to "2",
+            "X-Panel-Data-Limit" to "limited",
+            "X-Panel-Data-Limit-Bytes" to "10737418240",
+        ))
+
+        assertEquals(10737418240L, subscription.panelMetadata?.dataLimitBytes)
+    }
+
+    @Test
     fun panelQuotaAliasesOverrideUserinfoUsage() {
         val subscription = SubscriptionItem()
 

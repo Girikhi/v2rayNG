@@ -465,7 +465,9 @@ class MainActivity : HelperBaseActivity() {
     }
 
     private fun formatAccountData(metadata: PanelSubscriptionMetadata?): String? {
-        val total = metadata?.dataLimitBytes?.takeIf { it > 0L } ?: return null
+        val total = metadata?.dataLimitBytes ?: return null
+        if (total == 0L) return getString(R.string.simple_data_unlimited)
+        if (total < 0L) return null
         val totalText = android.text.format.Formatter.formatShortFileSize(this, total)
         val used = metadata.dataUsedBytes?.takeIf { it >= 0L }
             ?: return getString(R.string.simple_data_limit, totalText)

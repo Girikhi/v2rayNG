@@ -521,6 +521,7 @@
     <string name="simple_days_ratio">%1$s روز مانده از %2$s روز</string>
     <string name="simple_data_remaining">دادهٔ باقی‌مانده: %1$s از %2$s</string>
     <string name="simple_data_limit">سقف داده: %1$s</string>
+    <string name="simple_data_unlimited">حجم داده: نامحدود</string>
     <string name="simple_today">امروز</string>
     <string name="simple_less_than_one_hour_short">کمتر از ۱ ساعت</string>
     <plurals name="simple_days_short">

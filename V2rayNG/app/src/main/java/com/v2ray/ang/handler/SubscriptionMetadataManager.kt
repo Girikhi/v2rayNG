@@ -22,11 +22,12 @@ object SubscriptionMetadataManager {
     private const val HEADER_TELEGRAM_URL = "x-panel-telegram-url"
     private const val HEADER_METADATA_VERSION = "x-panel-metadata-version"
     private const val HEADER_PROFILE_UPDATE_INTERVAL = "profile-update-interval"
+    private const val HEADER_DATA_LIMIT_MODE = "x-panel-data-limit"
     private val dataUsedHeaders = listOf(
         "x-panel-data-used", "x-panel-traffic-used", "x-panel-used-bytes", "x-panel-used",
     )
     private val dataLimitHeaders = listOf(
-        "x-panel-data-limit", "x-panel-traffic-limit", "x-panel-total-bytes", "x-panel-total",
+        "x-panel-data-limit-bytes", "x-panel-traffic-limit", "x-panel-total-bytes", "x-panel-total",
     )
     private val uploadHeaders = listOf("x-panel-upload", "x-panel-upload-bytes")
     private val downloadHeaders = listOf("x-panel-download", "x-panel-download-bytes")
@@ -63,12 +64,19 @@ object SubscriptionMetadataManager {
         val parsedHeaderExpiry = headerExpiresAt?.let(::parseExpiryEpochSeconds)
         val upload = headerByteCount(normalizedHeaders, uploadHeaders) ?: userInfo?.uploadBytes
         val download = headerByteCount(normalizedHeaders, downloadHeaders) ?: userInfo?.downloadBytes
+        val dataLimitMode = normalizedHeaders[HEADER_DATA_LIMIT_MODE]
+            ?.trim()
+            ?.lowercase(Locale.ROOT)
         val used = headerByteCount(normalizedHeaders, dataUsedHeaders)
             ?: addByteCounts(upload, download)
             ?: old?.dataUsedBytes.takeUnless { replaceMissingFields }
-        val total = headerByteCount(normalizedHeaders, dataLimitHeaders)
-            ?: userInfo?.totalBytes
-            ?: old?.dataLimitBytes.takeUnless { replaceMissingFields }
+        val total = when (dataLimitMode) {
+            "unlimited" -> 0L
+            else -> parseByteCount(normalizedHeaders[HEADER_DATA_LIMIT_MODE])
+                ?: headerByteCount(normalizedHeaders, dataLimitHeaders)
+                ?: userInfo?.totalBytes
+                ?: old?.dataLimitBytes.takeUnless { replaceMissingFields }
+        }
 
         val updated = PanelSubscriptionMetadata(
             expiresAt = headerExpiresAt ?: old?.expiresAt.takeUnless { replaceMissingFields },
