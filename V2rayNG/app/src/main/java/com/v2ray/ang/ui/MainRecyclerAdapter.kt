@@ -5,11 +5,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.MainAdapterListener
 import com.v2ray.ang.databinding.ItemRecyclerMainBinding
 import com.v2ray.ang.dto.entities.ServersCache
+import com.v2ray.ang.enums.ManualConfigMode
+import com.v2ray.ang.extension.toast
+import com.v2ray.ang.handler.ManualConfigModes
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
@@ -48,11 +52,21 @@ class MainRecyclerAdapter(
         val affiliation = MmkvManager.decodeServerAffiliationInfo(server.guid)
         val delayMillis = affiliation?.testDelayMillis ?: 0L
 
-        holder.binding.tvName.text = context.getString(
-            R.string.simple_server_number,
-            position + 1,
-        )
+        val manual = ManualConfigModes.isManual(server.profile)
+        val fragmentUnavailable = manual && server.profile.manualMode == ManualConfigMode.FRAGMENT &&
+            !ManualConfigModes.supportsFragment(server.profile)
+        holder.binding.tvName.text = if (manual) server.profile.remarks
+            else context.getString(R.string.simple_server_number, position + 1)
+        holder.binding.tvName.textDirection = if (manual) View.TEXT_DIRECTION_FIRST_STRONG else View.TEXT_DIRECTION_LOCALE
+        holder.binding.tvMode.isVisible = manual
+        holder.binding.tvMode.setText(when (server.profile.manualMode) {
+            ManualConfigMode.FRAGMENT -> if (fragmentUnavailable) R.string.simple_mode_fragment_unavailable
+                else R.string.simple_mode_fragment
+            ManualConfigMode.GOOGLE_DOH -> R.string.simple_mode_google_doh
+            else -> R.string.simple_mode_original
+        })
         holder.binding.tvTestResult.text = when {
+            fragmentUnavailable -> context.getString(R.string.simple_mode_unavailable)
             delayMillis > 0L -> context.getString(R.string.server_test_delay_value, delayMillis)
             delayMillis < 0L -> context.getString(R.string.simple_ping_failed)
             else -> context.getString(R.string.simple_not_tested)
@@ -61,6 +75,7 @@ class MainRecyclerAdapter(
             ContextCompat.getColor(
                 context,
                 when {
+                    fragmentUnavailable -> R.color.colorPingRed
                     delayMillis > 0L -> R.color.colorPing
                     delayMillis < 0L -> R.color.colorPingRed
                     else -> R.color.md_theme_onSurfaceVariant
@@ -81,7 +96,8 @@ class MainRecyclerAdapter(
             if (selected) R.color.md_theme_primary else android.R.color.transparent
         )
         holder.binding.infoContainer.setOnClickListener {
-            adapterListener?.onSelectServer(server.guid)
+            if (fragmentUnavailable) context.toast(R.string.simple_fragment_requires_tcp)
+            else adapterListener?.onSelectServer(server.guid)
         }
     }
 

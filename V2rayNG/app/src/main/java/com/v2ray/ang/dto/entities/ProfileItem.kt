@@ -2,6 +2,7 @@ package com.v2ray.ang.dto.entities
 
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.enums.EConfigType
+import com.v2ray.ang.enums.ManualConfigMode
 import com.v2ray.ang.util.Utils
 
 data class ProfileItem(
@@ -9,6 +10,8 @@ data class ProfileItem(
     val configType: EConfigType,
     var subscriptionId: String = "",
     var addedTime: Long = System.currentTimeMillis(),
+    var manualMode: ManualConfigMode? = null,
+    var manualSourceId: String? = null,
 
     var remarks: String = "",
     var description: String? = null,
@@ -88,7 +91,8 @@ data class ProfileItem(
         if (other == null) return false
         val obj = other as ProfileItem
 
-        return (this.server == obj.server
+        return (this.manualMode == obj.manualMode
+                && this.server == obj.server
                 && this.serverPort == obj.serverPort
                 && this.password == obj.password
                 && this.method == obj.method

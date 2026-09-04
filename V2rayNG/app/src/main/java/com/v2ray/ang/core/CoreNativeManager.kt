@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object CoreNativeManager {
     private val initialized = AtomicBoolean(false)
+    private val controllerStartupLock = Any()
 
     /**
      * Initialize V2Ray core environment.
@@ -83,6 +84,34 @@ object CoreNativeManager {
         }
     }
 
+    /** The native outbound-only helper removes DNS/routing. Keep them for the DoH variant. */
+    fun measureDelayWithDns(config: String, testUrl: String): Long {
+        var controller: CoreController? = null
+        return try {
+            val probe = newCoreController(object : CoreCallbackHandler {
+                override fun startup(): Long = 0
+                override fun shutdown(): Long = 0
+                override fun onEmitStatus(code: Long, status: String?): Long = 0
+            })
+            controller = probe
+            // The speed-test config has no inbounds, so this never opens a TUN or listening port.
+            startController(probe, config, 0)
+            probe.measureDelay(testUrl)
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "Failed to measure delay with DNS", e)
+            -1L
+        } finally {
+            runCatching { controller?.stopLoop() }
+        }
+    }
+
+    /** StartLoop sets a process-global TUN descriptor; serialize VPN and probe startup. */
+    fun startController(controller: CoreController, config: String, tunFd: Int) {
+        synchronized(controllerStartupLock) {
+            controller.startLoop(config, tunFd)
+        }
+    }
+
     /**
      * Create a new core controller instance.
      *
@@ -91,7 +120,7 @@ object CoreNativeManager {
      */
     fun newCoreController(handler: CoreCallbackHandler): CoreController {
         return try {
-            Libv2ray.newCoreController(handler)
+            synchronized(controllerStartupLock) { Libv2ray.newCoreController(handler) }
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to create core controller", e)
             throw e

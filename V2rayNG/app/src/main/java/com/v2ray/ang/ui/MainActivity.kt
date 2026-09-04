@@ -138,6 +138,10 @@ class MainActivity : HelperBaseActivity() {
         SubscriptionUpdater.sync()
         mainViewModel.reloadServerList()
         lifecycleScope.launch {
+            if (withContext(Dispatchers.IO) { AngConfigManager.ensureManualConfigModes() }) {
+                setupGroupTab()
+                mainViewModel.reloadServerList()
+            }
             delay(650L)
             mainViewModel.startStartupHealthCheck()
         }

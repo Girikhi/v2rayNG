@@ -319,6 +319,12 @@
     <string name="simple_clipboard">Clipboard</string>
     <string name="simple_qr_code">QR code</string>
     <string name="simple_manual_configs">Manual configs</string>
+    <string name="simple_mode_original">Original</string>
+    <string name="simple_mode_fragment">Fragment</string>
+    <string name="simple_mode_google_doh">Google DoH</string>
+    <string name="simple_mode_unavailable">Unavailable</string>
+    <string name="simple_mode_fragment_unavailable">Fragment · unsupported transport</string>
+    <string name="simple_fragment_requires_tcp">Fragment requires a TCP-based transport. Use Original or Google DoH for this config.</string>
     <string name="simple_status_local">Local</string>
     <string name="simple_invalid_import">No valid config found. Copy a config link or a subscription URL.</string>
     <string name="simple_qr_unavailable">Cannot create a QR code for this account. Use Clipboard instead.</string>

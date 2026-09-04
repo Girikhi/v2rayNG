@@ -462,6 +462,12 @@
     <string name="simple_clipboard">کلیپ‌بورد</string>
     <string name="simple_qr_code">کد کیوآر</string>
     <string name="simple_manual_configs">کانفیگ‌های دستی</string>
+    <string name="simple_mode_original">اصلی</string>
+    <string name="simple_mode_fragment">فرگمنت</string>
+    <string name="simple_mode_google_doh">DoH گوگل</string>
+    <string name="simple_mode_unavailable">پشتیبانی نمی‌شود</string>
+    <string name="simple_mode_fragment_unavailable">فرگمنت · انتقال ناسازگار</string>
+    <string name="simple_fragment_requires_tcp">فرگمنت به انتقال مبتنی بر TCP نیاز دارد. برای این کانفیگ از حالت اصلی یا DoH گوگل استفاده کنید.</string>
     <string name="simple_status_local">محلی</string>
     <string name="simple_invalid_import">کانفیگ معتبری پیدا نشد. لینک کانفیگ یا اشتراک را کپی کنید.</string>
     <string name="simple_qr_unavailable">ساخت کد کیوآر برای این حساب ممکن نیست. از کلیپ‌بورد استفاده کنید.</string>

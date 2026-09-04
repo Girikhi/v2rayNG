@@ -8,6 +8,7 @@ import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.isNotNullEmpty
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.ManualConfigModes
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SpeedtestManager
 import kotlinx.coroutines.CancellationException
@@ -83,7 +84,8 @@ class RealPingWorkerService(
         val retFailure = -1L
 
         val config = MmkvManager.decodeServerConfig(guid) ?: return retFailure
-        if (!config.configType.isComplexType()
+        if (!ManualConfigModes.isManual(config)
+            && !config.configType.isComplexType()
             && config.configType != EConfigType.HYSTERIA2
             && config.server.isNotNullEmpty()
             && config.serverPort?.toIntOrNull() != null
@@ -100,6 +102,10 @@ class RealPingWorkerService(
         if (!configResult.status) {
             return retFailure
         }
-        return CoreNativeManager.measureOutboundDelay(configResult.content, SettingsManager.getDelayTestUrl())
+        return if (ManualConfigModes.usesGoogleDns(config)) {
+            CoreNativeManager.measureDelayWithDns(configResult.content, SettingsManager.getDelayTestUrl())
+        } else {
+            CoreNativeManager.measureOutboundDelay(configResult.content, SettingsManager.getDelayTestUrl())
+        }
     }
 }

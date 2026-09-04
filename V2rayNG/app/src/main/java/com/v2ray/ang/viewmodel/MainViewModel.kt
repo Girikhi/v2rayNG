@@ -28,6 +28,7 @@ import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.ManualConfigModes
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.util.LogUtil
@@ -94,6 +95,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             MmkvManager.decodeServerList(subscriptionId)
         }
 
+        if (subscriptionId == AppConfig.DEFAULT_SUBSCRIPTION_ID) {
+            serverList = ManualConfigModes.failuresLast(serverList) {
+                MmkvManager.decodeServerAffiliationInfo(it)?.testDelayMillis ?: 0L
+            }.toMutableList()
+        }
         updateCache()
         updateListAction.value = -1
     }
@@ -143,7 +149,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         for (guid in serverList) {
             val profile = MmkvManager.decodeServerConfig(guid) ?: continue
-            val shouldHideFailed = subscriptionId in healthFilteredSubscriptions
+            val shouldHideFailed = !ManualConfigModes.isManual(profile) && subscriptionId in healthFilteredSubscriptions
             val testDelay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L
             if (shouldHideFailed && testDelay < 0L) {
                 continue
@@ -328,7 +334,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getVisibleServerCount(subscriptionId: String): Int {
         val serverGuids = MmkvManager.decodeServerList(subscriptionId)
-        if (subscriptionId !in healthFilteredSubscriptions) {
+        if (subscriptionId == AppConfig.DEFAULT_SUBSCRIPTION_ID || subscriptionId !in healthFilteredSubscriptions) {
             return serverGuids.size
         }
         return serverGuids.count { guid ->
@@ -442,6 +448,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * @param subId The subscription ID to sort servers for.
      */
     private fun sortByTestResultsForSub(subId: String) {
+        if (subId == AppConfig.DEFAULT_SUBSCRIPTION_ID) {
+            val sorted = ManualConfigModes.failuresLast(MmkvManager.decodeServerList(subId)) {
+                MmkvManager.decodeServerAffiliationInfo(it)?.testDelayMillis ?: 0L
+            }
+            MmkvManager.encodeServerList(sorted.toMutableList(), subId)
+            return
+        }
         data class ServerDelay(var guid: String, var testDelayMillis: Long)
 
         val serverDelays = mutableListOf<ServerDelay>()
@@ -507,7 +520,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // A worker exception may leave a cleared result at zero. Once the batch is over,
-            // every non-positive result is a confirmed failure and can be hidden consistently.
+            // every non-positive result is a failure (manual entries stay visible at the bottom).
             batch.serverGuids.forEach { guid ->
                 val delay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L
                 if (delay <= 0L) {
@@ -516,10 +529,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             if (MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_REMOVE_INVALID_AFTER_TEST)) {
-                removeInvalidServer()
+                batch.serverGuids.filter { guid ->
+                    MmkvManager.decodeServerConfig(guid)?.let { !ManualConfigModes.isManual(it) } == true
+                }.forEach { MmkvManager.removeInvalidServer(it) }
             }
 
-            if (MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_SORT_AFTER_TEST)) {
+            if (batch.subscriptionId == AppConfig.DEFAULT_SUBSCRIPTION_ID ||
+                MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_SORT_AFTER_TEST)
+            ) {
                 if (batch.subscriptionId.isNotEmpty()) {
                     sortByTestResultsForSub(batch.subscriptionId)
                 } else {
@@ -535,7 +552,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val workingGuids = orderedGuids.filter { guid ->
                 (MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L) > 0L
             }
-            if (batch.subscriptionId.isNotEmpty()) {
+            if (batch.subscriptionId.isNotEmpty() && batch.subscriptionId != AppConfig.DEFAULT_SUBSCRIPTION_ID) {
                 healthFilteredSubscriptions.add(batch.subscriptionId)
             }
 

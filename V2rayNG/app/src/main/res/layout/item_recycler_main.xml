@@ -37,17 +37,35 @@
             android:layout_marginEnd="12dp"
             android:background="@android:color/transparent" />
 
-        <TextView
-            android:id="@+id/tv_name"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/md_theme_onSurface"
-            android:textDirection="locale"
-            android:textSize="15sp"
-            tools:text="Server name" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/md_theme_onSurface"
+                android:textDirection="locale"
+                android:textSize="15sp"
+                tools:text="Server name" />
+
+            <TextView
+                android:id="@+id/tv_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/md_theme_onSurfaceVariant"
+                android:textDirection="locale"
+                android:textSize="11sp"
+                android:visibility="gone"
+                tools:text="Original" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tv_test_result"

@@ -257,7 +257,7 @@ object CoreServiceManager {
 
         NotificationManager.showNotification(currentConfig)
         CoreNativeManager.reconcileBrowserDialer(dialerAddr)
-        coreController.startLoop(result.content, tunFd)
+        CoreNativeManager.startController(coreController, result.content, tunFd)
 
         if (!coreController.isRunning) {
             error("Core failed to start")

@@ -14,6 +14,7 @@ import com.v2ray.ang.enums.CoreResolvedType
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isNotNullEmpty
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.ManualConfigModes
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.JsonUtil
@@ -61,7 +62,8 @@ object CoreConfigManager {
                 return buildV2rayCustomConfig(configContext)
             }
             val v2rayConfig = buildUnifiedConfig(configContext)
-            postProcessForSpeedtest(v2rayConfig)
+            postProcessForSpeedtest(v2rayConfig,
+                ManualConfigModes.usesGoogleDns(configContext.resolvedOutbounds.first().profile))
 
             return toConfigResult(configContext, v2rayConfig)
         } catch (e: Exception) {
@@ -192,6 +194,9 @@ object CoreConfigManager {
         applyObservability(v2rayConfig, balancerStrategies)
         applySpeedDisabled(v2rayConfig)
         resolveOutboundDomainsToHosts(v2rayConfig)
+        if (ManualConfigModes.usesGoogleDns(primaryResolvedOutbound.profile)) {
+            ManualConfigModes.applyGoogleDns(v2rayConfig)
+        }
 
         return v2rayConfig
     }
@@ -390,11 +395,14 @@ object CoreConfigManager {
     /**
      * Trim runtime sections that are not needed for latency testing.
      */
-    private fun postProcessForSpeedtest(v2rayConfig: V2rayConfig) {
-        v2rayConfig.log.loglevel = MmkvManager.decodeSettingsString(AppConfig.PREF_LOGLEVEL) ?: "warning"
+    internal fun postProcessForSpeedtest(v2rayConfig: V2rayConfig, keepDns: Boolean = false) {
         v2rayConfig.inbounds.clear()
-        v2rayConfig.routing.rules.clear()
-        v2rayConfig.dns = null
+        if (keepDns) {
+            v2rayConfig.routing.rules.removeAll { it.inboundTag?.contains(AppConfig.TAG_DNS) != true }
+        } else {
+            v2rayConfig.routing.rules.clear()
+            v2rayConfig.dns = null
+        }
         v2rayConfig.fakedns = null
         v2rayConfig.stats = null
         v2rayConfig.policy = null

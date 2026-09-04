@@ -12,6 +12,8 @@ import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.enums.EConfigType
+import com.v2ray.ang.enums.ManualConfigMode
+import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.extension.isNotNullEmpty
 import com.v2ray.ang.fmt.CustomFmt
 import com.v2ray.ang.fmt.Hysteria2Fmt
@@ -174,6 +176,10 @@ object AngConfigManager {
         val subscription = MmkvManager.decodeSubscription(accountId) ?: return ""
         if (subscription.url.isNotBlank()) return subscription.url.trim()
         return MmkvManager.decodeServerList(accountId)
+            .filter { guid ->
+                val profile = MmkvManager.decodeServerConfig(guid)
+                profile?.manualMode == null || profile.manualMode == ManualConfigMode.ORIGINAL
+            }
             .map(::shareConfig)
             .filter { it.isNotBlank() }
             .joinToString("\n")
@@ -209,8 +215,29 @@ object AngConfigManager {
             MmkvManager.encodeSubscription(accountId, SubscriptionItem(remarks = accountName))
         }
         // batchSaveConfigs prepends entries; reverse to retain clipboard order.
-        batchSaveConfigs(configs.asReversed(), accountId)
-        return configs.size
+        val variants = configs.flatMap { ManualConfigModes.variants(it, Utils.getUuid()) }
+        batchSaveConfigs(variants.asReversed(), accountId)
+        return variants.size
+    }
+
+    /** Upgrade existing manual accounts without replacing their original configs. */
+    fun ensureManualConfigModes(): Boolean {
+        val accountId = AppConfig.DEFAULT_SUBSCRIPTION_ID
+        val existing = MmkvManager.decodeServerList(accountId).mapNotNull { guid ->
+            MmkvManager.decodeServerConfig(guid)?.let { ServersCache(guid, it) }
+        }
+        if (existing.isEmpty()) return false
+        val completed = ManualConfigModes.completeModes(existing)
+        val originals = existing.associateBy { it.guid }
+        val changed = completed.filter { item ->
+            val previous = originals[item.guid]?.profile
+            previous == null || previous.manualMode != item.profile.manualMode ||
+                previous.manualSourceId != item.profile.manualSourceId
+        }
+        if (changed.isEmpty()) return false
+        changed.forEach { MmkvManager.encodeProfileDirect(it.guid, JsonUtil.toJson(it.profile)) }
+        MmkvManager.encodeServerList(completed.map { it.guid }.toMutableList(), accountId)
+        return true
     }
 
     /**
