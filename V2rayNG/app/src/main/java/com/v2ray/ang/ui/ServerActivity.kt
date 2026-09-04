@@ -551,7 +551,7 @@ class ServerActivity : BaseActivity() {
         }
         //LogUtil.i(AppConfig.TAG, JsonUtil.toJsonPretty(config) ?: "")
         MmkvManager.encodeServerConfig(editGuid, config)
-        if (editGuid.isNotEmpty() && ManualConfigModes.isManual(config)) {
+        if (editGuid.isNotEmpty()) {
             // A previous ping is not a valid result for the newly edited connection settings.
             MmkvManager.encodeServerTestDelayMillis(editGuid, 0L)
         }
