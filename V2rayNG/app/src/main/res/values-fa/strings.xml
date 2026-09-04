@@ -462,6 +462,7 @@
     <string name="simple_clipboard">کلیپ‌بورد</string>
     <string name="simple_qr_code">کد کیوآر</string>
     <string name="simple_manual_configs">کانفیگ‌های دستی</string>
+    <string name="simple_server_address_description">آدرس سرور: %1$s</string>
     <string name="simple_mode_original">اصلی</string>
     <string name="simple_mode_fragment">فرگمنت</string>
     <string name="simple_mode_google_doh">DoH گوگل</string>

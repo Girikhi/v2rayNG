@@ -62,6 +62,12 @@ class MainRecyclerAdapter(
         holder.binding.tvName.maxLines = if (manual) Int.MAX_VALUE else 1
         holder.binding.tvName.ellipsize = if (manual) null else TextUtils.TruncateAt.END
         holder.binding.tvName.textDirection = if (manual) View.TEXT_DIRECTION_FIRST_STRONG else View.TEXT_DIRECTION_LOCALE
+        // Show the actual configured endpoint, not the masked description, SNI or DNS resolver.
+        // Binding remains local-only: resolving hostnames here would stall scrolling and pings.
+        val serverAddress = server.profile.server.orEmpty().trim()
+        holder.binding.tvAddress.isVisible = manual && serverAddress.isNotEmpty()
+        holder.binding.tvAddress.text = serverAddress
+        holder.binding.tvAddress.contentDescription = context.getString(R.string.simple_server_address_description, serverAddress)
         holder.binding.buttonEdit.isVisible = manual
         holder.binding.buttonEdit.setOnClickListener {
             val currentPosition = holder.bindingAdapterPosition

@@ -123,6 +123,22 @@ class AccountConfigTest {
         assertEquals("", AngConfigManager.shareConfig(ProfileItem.create(EConfigType.CUSTOM)))
     }
 
+    @Test
+    fun manualIpAddressesAndHostnamesStayCompleteInEveryMode() {
+        listOf("203.0.113.42", "[2001:db8:1234:5678:90ab:cdef:1234:5678]", "edge.example.com").forEach { address ->
+            val link = "vless://$UUID@$address:443?encryption=none&type=ws&security=tls&sni=cdn.example.com#Full%20name"
+            val profile = AngConfigManager.parseStandaloneConfigs(link).single()
+            assertEquals(address.removeSurrounding("[", "]"), profile.server!!.removeSurrounding("[", "]"))
+            assertEquals("cdn.example.com", profile.sni)
+            assertNotEquals(profile.sni, profile.server)
+            ManualConfigModes.variants(profile, "source").forEach { variant ->
+                assertEquals(profile.server, variant.server)
+                assertEquals("Full name", variant.remarks)
+                assertFalse(variant.server!!.contains("***"))
+            }
+        }
+    }
+
     companion object {
         private const val UUID = "00000000-0000-4000-8000-000000000001"
         private const val VLESS = "vless://$UUID@one.example.com:443?encryption=none&type=ws&security=tls&sni=cdn.example.com&path=%2Ftunnel#%D8%AD%D8%B3%D8%A7%D8%A8%20%D9%85%D9%86"

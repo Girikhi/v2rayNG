@@ -319,6 +319,7 @@
     <string name="simple_clipboard">Clipboard</string>
     <string name="simple_qr_code">QR code</string>
     <string name="simple_manual_configs">Manual configs</string>
+    <string name="simple_server_address_description">Server address: %1$s</string>
     <string name="simple_mode_original">Original</string>
     <string name="simple_mode_fragment">Fragment</string>
     <string name="simple_mode_google_doh">Google DoH</string>
