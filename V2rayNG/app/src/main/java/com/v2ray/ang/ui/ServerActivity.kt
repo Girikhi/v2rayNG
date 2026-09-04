@@ -173,7 +173,7 @@ class ServerActivity : BaseActivity() {
             else -> null
         } ?: return
         setContentViewWithToolbar(layoutId, showHomeAsUp = true, title = (config?.configType ?: createConfigType).toString())
-        if (config != null && ManualConfigModes.isManual(config)) {
+        if (config != null && ManualConfigModes.hasMode(config)) {
             supportActionBar?.subtitle = getString(when (config.manualMode) {
                 ManualConfigMode.FRAGMENT -> R.string.simple_mode_fragment
                 ManualConfigMode.GOOGLE_DOH -> R.string.simple_mode_google_doh

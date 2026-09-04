@@ -314,23 +314,22 @@ object AngConfigManager {
             val subItem = MmkvManager.decodeSubscription(subid)
 
             // Parse all configs first (no I/O during parsing)
-            val configs = mutableListOf<ProfileItem>()
-            servers.lines()
+            val parsedConfigs = servers.lines()
                 .distinct()
-                .reversed()
-                .forEach {
-                    val config = parseConfig(it, subid, subItem)
-                    if (config != null) {
-                        configs.add(config)
-                    }
-                }
+                .mapNotNull { parseConfig(it, subid, subItem) }
+            val configs = if (!subItem?.url.isNullOrBlank()) {
+                ManualConfigModes.expandSubscriptionProfiles(parsedConfigs)
+            } else {
+                parsedConfigs
+            }
 
             // Batch save all parsed configs (only one serverList read/write)
             if (configs.isNotEmpty()) {
                 if (!append) {
                     MmkvManager.removeServerViaSubid(subid)
                 }
-                val keyToProfile = batchSaveConfigs(configs, subid)
+                // batchSaveConfigs prepends entries; reverse to preserve source and mode order.
+                val keyToProfile = batchSaveConfigs(configs.asReversed(), subid)
                 val matchKey = findMatchedProfileKey(keyToProfile, removedSelected)
                 matchKey?.let { MmkvManager.setSelectServer(it) }
             }
@@ -391,41 +390,58 @@ object AngConfigManager {
         // Level 0: Full match (remarks + server + port + password)
         if (target.remarks.isNotBlank()) {
             keyToProfile.entries.firstOrNull { (_, saved) ->
-                isSameText(saved.remarks, target.remarks) &&
-                        isSameText(saved.server, target.server) &&
-                        isSameText(saved.serverPort, target.serverPort) &&
-                        isSameText(saved.password, target.password)
+                sameMode(saved, target) &&
+                    isSameText(saved.remarks, target.remarks) &&
+                    isSameText(saved.server, target.server) &&
+                    isSameText(saved.serverPort, target.serverPort) &&
+                    isSameText(saved.password, target.password)
             }?.key?.let { return it }
         }
 
         // Level 1: Match by remarks
         if (target.remarks.isNotBlank()) {
             keyToProfile.entries.firstOrNull { (_, saved) ->
-                isSameText(saved.remarks, target.remarks)
+                sameMode(saved, target) && isSameText(saved.remarks, target.remarks)
             }?.key?.let { return it }
         }
 
         // Level 2: Exact match (server + port + password)
         keyToProfile.entries.firstOrNull { (_, saved) ->
-            isSameText(saved.server, target.server) &&
+            sameMode(saved, target) && isSameText(saved.server, target.server) &&
                     isSameText(saved.serverPort, target.serverPort) &&
                     isSameText(saved.password, target.password)
         }?.key?.let { return it }
 
         // Level 3: Match by server + port
         keyToProfile.entries.firstOrNull { (_, saved) ->
-            isSameText(saved.server, target.server) &&
+            sameMode(saved, target) && isSameText(saved.server, target.server) &&
                     isSameText(saved.serverPort, target.serverPort)
         }?.key?.let { return it }
 
         // Level 4: Match by server only
         keyToProfile.entries.firstOrNull { (_, saved) ->
-            isSameText(saved.server, target.server)
+            sameMode(saved, target) && isSameText(saved.server, target.server)
         }?.key?.let { return it }
+
+        if (target.manualMode != null) {
+            keyToProfile.entries.firstOrNull { (_, saved) -> saved.manualMode == target.manualMode }
+                ?.key?.let { return it }
+        } else {
+            keyToProfile.entries
+                .firstOrNull { (_, saved) -> saved.manualMode == ManualConfigMode.ORIGINAL }
+                ?.key?.let { return it }
+        }
 
         // If old selected node cannot be matched, fall back to the first imported config.
         return keyToProfile.keys.firstOrNull()
     }
+
+    private fun sameMode(saved: ProfileItem, target: ProfileItem): Boolean =
+        if (target.manualMode == null) {
+            saved.manualMode == null || saved.manualMode == ManualConfigMode.ORIGINAL
+        } else {
+            saved.manualMode == target.manualMode
+        }
 
     /**
      * Returns the currently selected profile if it belongs to the target subscription and will be replaced.

@@ -435,28 +435,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * @param subId The subscription ID to sort servers for.
      */
     private fun sortByTestResultsForSub(subId: String) {
-        if (subId == AppConfig.DEFAULT_SUBSCRIPTION_ID) {
-            val sorted = ManualConfigModes.failuresLast(MmkvManager.decodeServerList(subId)) {
-                MmkvManager.decodeServerAffiliationInfo(it)?.testDelayMillis ?: 0L
-            }
-            MmkvManager.encodeServerList(sorted.toMutableList(), subId)
-            return
+        val sorted = ManualConfigModes.failuresLast(MmkvManager.decodeServerList(subId)) {
+            MmkvManager.decodeServerAffiliationInfo(it)?.testDelayMillis ?: 0L
         }
-        data class ServerDelay(var guid: String, var testDelayMillis: Long)
-
-        val serverDelays = mutableListOf<ServerDelay>()
-        val serverListToSort = MmkvManager.decodeServerList(subId)
-
-        serverListToSort.forEach { key ->
-            val delay = MmkvManager.decodeServerAffiliationInfo(key)?.testDelayMillis ?: 0L
-            serverDelays.add(ServerDelay(key, if (delay <= 0L) 999999 else delay))
-        }
-        serverDelays.sortBy { it.testDelayMillis }
-
-        val sortedServerList = serverDelays.map { it.guid }.toMutableList()
-
-        // Save the sorted list for this subscription
-        MmkvManager.encodeServerList(sortedServerList, subId)
+        MmkvManager.encodeServerList(sorted.toMutableList(), subId)
     }
 
 

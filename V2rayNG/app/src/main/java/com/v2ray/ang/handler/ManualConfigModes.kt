@@ -19,13 +19,25 @@ object ManualConfigModes {
     private val udpTransports = setOf("kcp", "quic", "hysteria")
 
     fun isManual(profile: ProfileItem): Boolean = profile.subscriptionId == AppConfig.DEFAULT_SUBSCRIPTION_ID
+    fun hasMode(profile: ProfileItem): Boolean = profile.manualMode != null
+    fun supportsModes(profile: ProfileItem): Boolean = profile.configType in linkTypes
 
     fun usesGoogleDns(profile: ProfileItem): Boolean =
-        isManual(profile) && profile.manualMode == ManualConfigMode.GOOGLE_DOH
+        profile.manualMode == ManualConfigMode.GOOGLE_DOH
 
     fun variants(profile: ProfileItem, sourceId: String): List<ProfileItem> =
         ManualConfigMode.entries.map { mode ->
             profile.copy(manualMode = mode, manualSourceId = sourceId)
+        }
+
+    /** Expand share-link profiles downloaded from a subscription without changing their names or account. */
+    fun expandSubscriptionProfiles(profiles: List<ProfileItem>): List<ProfileItem> =
+        profiles.flatMap { profile ->
+            if (!isManual(profile) && supportsModes(profile)) {
+                variants(profile, UUID.randomUUID().toString())
+            } else {
+                listOf(profile)
+            }
         }
 
     /** Preserve original GUIDs, names, settings and selection; repair missing variants idempotently. */
@@ -70,7 +82,7 @@ object ManualConfigModes {
             profile.alpn?.split(',')?.any { it.trim().startsWith("h3") } != true
 
     fun applyFragment(profile: ProfileItem, outbound: V2rayConfig.OutboundBean) {
-        if (!isManual(profile) || profile.manualMode != ManualConfigMode.FRAGMENT) return
+        if (profile.manualMode != ManualConfigMode.FRAGMENT) return
         require(supportsFragment(profile)) { "Fragment requires a TCP-based transport" }
         val stream = requireNotNull(outbound.streamSettings) { "Fragment requires stream settings" }
         val masks = stream.finalmask?.let { JsonUtil.parseString(JsonUtil.toJson(it))?.asJsonObject }

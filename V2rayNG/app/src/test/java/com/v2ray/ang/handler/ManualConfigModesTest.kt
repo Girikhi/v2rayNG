@@ -61,6 +61,22 @@ class ManualConfigModesTest {
     }
 
     @Test
+    fun simpleSubscriptionProfilesReceiveAllModesInsideTheirAccount() {
+        val subscribed = profile().copy(subscriptionId = "panel-account")
+        val composite = subscribed.copy(configType = EConfigType.CUSTOM)
+
+        val expanded = ManualConfigModes.expandSubscriptionProfiles(listOf(subscribed, composite))
+
+        assertEquals(4, expanded.size)
+        assertEquals(ManualConfigMode.entries, expanded.take(3).map { it.manualMode })
+        assertTrue(expanded.take(3).all { it.subscriptionId == "panel-account" })
+        assertTrue(expanded.take(3).all { it.remarks == subscribed.remarks })
+        assertEquals(1, expanded.take(3).map { it.manualSourceId }.distinct().size)
+        assertEquals(composite, expanded.last())
+        assertNull(expanded.last().manualMode)
+    }
+
+    @Test
     fun migrationKeepsOriginalGuidAndIsIdempotent() {
         val original = ServersCache("selected-guid", profile())
         val completed = ManualConfigModes.completeModes(listOf(original))
@@ -204,16 +220,22 @@ class ManualConfigModesTest {
     }
 
     @Test
-    fun originalAndDohModesDoNotAddFragmentAndSubscriptionsAreUnchanged() {
-        listOf(profile(), profile(ManualConfigMode.ORIGINAL), profile(ManualConfigMode.GOOGLE_DOH),
-            profile(ManualConfigMode.FRAGMENT).copy(subscriptionId = "panel-account")).forEach { source ->
+    fun originalAndDohModesDoNotAddFragmentButSubscriptionFragmentDoes() {
+        listOf(profile(), profile(ManualConfigMode.ORIGINAL), profile(ManualConfigMode.GOOGLE_DOH)).forEach { source ->
             val outbound = config().outbounds.first()
             val before = JsonUtil.toJson(outbound)
             ManualConfigModes.applyFragment(source, outbound)
             assertEquals(before, JsonUtil.toJson(outbound))
         }
+        val subscribedFragment = profile(ManualConfigMode.FRAGMENT).copy(subscriptionId = "panel-account")
+        val subscriptionOutbound = config().outbounds.first()
+        ManualConfigModes.applyFragment(subscribedFragment, subscriptionOutbound)
+        assertNotNull(subscriptionOutbound.streamSettings!!.finalmask)
+
         assertTrue(ManualConfigModes.usesGoogleDns(profile(ManualConfigMode.GOOGLE_DOH)))
-        assertFalse(ManualConfigModes.usesGoogleDns(profile(ManualConfigMode.GOOGLE_DOH).copy(subscriptionId = "panel")))
+        assertTrue(ManualConfigModes.usesGoogleDns(
+            profile(ManualConfigMode.GOOGLE_DOH).copy(subscriptionId = "panel-account")
+        ))
         assertFalse(ManualConfigModes.usesGoogleDns(profile(ManualConfigMode.ORIGINAL)))
     }
 

@@ -54,7 +54,8 @@ class MainRecyclerAdapter(
         val delayMillis = affiliation?.testDelayMillis ?: 0L
 
         val manual = ManualConfigModes.isManual(server.profile)
-        val fragmentUnavailable = manual && server.profile.manualMode == ManualConfigMode.FRAGMENT &&
+        val hasMode = ManualConfigModes.hasMode(server.profile)
+        val fragmentUnavailable = hasMode && server.profile.manualMode == ManualConfigMode.FRAGMENT &&
             !ManualConfigModes.supportsFragment(server.profile)
         holder.binding.tvName.text = if (manual) server.profile.remarks
             else context.getString(R.string.simple_server_number, position + 1)
@@ -76,7 +77,7 @@ class MainRecyclerAdapter(
                 adapterListener?.onEdit(current.guid, currentPosition, current.profile)
             }
         }
-        holder.binding.tvMode.isVisible = manual
+        holder.binding.tvMode.isVisible = hasMode
         holder.binding.tvMode.setText(when (server.profile.manualMode) {
             ManualConfigMode.FRAGMENT -> if (fragmentUnavailable) R.string.simple_mode_fragment_unavailable
                 else R.string.simple_mode_fragment

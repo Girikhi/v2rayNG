@@ -585,7 +585,7 @@ object CoreOutboundBuilder {
         }
 
         if (profileItem.finalMask.isNullOrEmpty() &&
-            !(ManualConfigModes.isManual(profileItem) && profileItem.manualMode != null)
+            !ManualConfigModes.hasMode(profileItem)
         ) {
             updateOutboundFragment(streamSettings)
         }
