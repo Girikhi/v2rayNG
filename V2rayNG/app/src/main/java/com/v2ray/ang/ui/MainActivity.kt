@@ -23,6 +23,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.databinding.ActivityMainBinding
+import com.v2ray.ang.databinding.ItemQrcodeBinding
 import com.v2ray.ang.dto.ServerHealthPhase
 import com.v2ray.ang.dto.entities.PanelSubscriptionMetadata
 import com.v2ray.ang.dto.entities.SubscriptionCache
@@ -38,6 +39,7 @@ import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.util.LogUtil
+import com.v2ray.ang.util.QRCodeDecoder
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -127,7 +129,7 @@ class MainActivity : HelperBaseActivity() {
         binding.accountRecycler.adapter = accountDashboardAdapter
 
         binding.fab.setOnClickListener { handleFabAction() }
-        binding.buttonAdd.setOnClickListener { showAddSubscriptionMenu(it) }
+        binding.buttonAdd.setOnClickListener { showAddMenu(it) }
         binding.buttonPing.setOnClickListener { mainViewModel.testAllRealPing() }
         binding.buttonRefresh.setOnClickListener { importConfigViaSub() }
 
@@ -236,7 +238,7 @@ class MainActivity : HelperBaseActivity() {
         val metadata = subscription.panelMetadata
         val workspace = metadata?.workspace
             ?.takeIf { it.isNotBlank() }
-            ?: subscription.remarks.ifBlank { getString(R.string.simple_default_account_name) }
+            ?: accountName(accountId, subscription)
         val user = metadata?.user
             ?.takeIf { it.isNotBlank() }
             ?: workspace
@@ -247,6 +249,13 @@ class MainActivity : HelperBaseActivity() {
             workspace = workspace,
         )
     }
+
+    private fun accountName(accountId: String, subscription: SubscriptionItem): String =
+        if (accountId == AppConfig.DEFAULT_SUBSCRIPTION_ID && subscription.url.isBlank()) {
+            getString(R.string.simple_manual_configs)
+        } else {
+            subscription.remarks.ifBlank { getString(R.string.simple_default_account_name) }
+        }
 
     private fun statusColor(status: String?): Int = when (status) {
         "active" -> R.color.colorPing
@@ -280,16 +289,17 @@ class MainActivity : HelperBaseActivity() {
             "scheduled" -> getString(R.string.simple_status_scheduled)
             "disabled" -> getString(R.string.simple_status_disabled)
             "expired" -> getString(R.string.simple_status_expired)
-            null -> getString(
-                if (subscription == null) R.string.simple_status_no_account
-                else R.string.simple_status_not_synced,
-            )
+            null -> getString(when {
+                subscription == null -> R.string.simple_status_no_account
+                subscription.url.isBlank() -> R.string.simple_status_local
+                else -> R.string.simple_status_not_synced
+            })
             else -> getString(R.string.simple_status_unknown)
         }
         val color = ContextCompat.getColor(this, statusColor(rawStatus))
         val workspace = metadata?.workspace
             ?.takeIf { it.isNotBlank() }
-            ?: subscription?.remarks?.takeIf { it.isNotBlank() }
+            ?: subscription?.let { accountName(accountId.orEmpty(), it) }
         val user = metadata?.user
             ?.takeIf { it.isNotBlank() }
             ?: workspace
@@ -306,6 +316,7 @@ class MainActivity : HelperBaseActivity() {
             true,
         )
         binding.tvWorkspaceName.text = workspace ?: getString(R.string.simple_value_unavailable)
+        binding.buttonRefresh.isEnabled = !subscription?.url.isNullOrBlank()
         binding.buttonTelegramChannel.isVisible = telegramUrl != null
         binding.buttonTelegramChannel.text = telegramUrl?.let(::telegramLabel).orEmpty()
         binding.buttonTelegramChannel.setOnClickListener(
@@ -357,21 +368,46 @@ class MainActivity : HelperBaseActivity() {
     }
 
     private fun shareAccount(accountId: String) {
-        val subscriptionUrl = MmkvManager.decodeSubscription(accountId)?.url
-            ?.takeIf { it.isNotBlank() }
-            ?: return
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, subscriptionUrl)
-        }
-        startActivity(Intent.createChooser(shareIntent, getString(R.string.simple_share_account)))
+        AlertDialog.Builder(this)
+            .setTitle(R.string.simple_share_account)
+            .setItems(arrayOf(getString(R.string.simple_clipboard), getString(R.string.simple_qr_code))) { _, choice ->
+                lifecycleScope.launch {
+                    val content = withContext(Dispatchers.IO) {
+                        runCatching { AngConfigManager.getAccountShareContent(accountId) }.getOrDefault("")
+                    }
+                    if (content.isBlank()) {
+                        toastError(R.string.toast_failure)
+                        return@launch
+                    }
+                    if (choice == 0) {
+                        Utils.setClipboard(this@MainActivity, content)
+                        toast(R.string.toast_success)
+                    } else {
+                        val bitmap = withContext(Dispatchers.Default) {
+                            QRCodeDecoder.createQRCode(content)
+                        }
+                        if (bitmap == null) {
+                            toastError(R.string.simple_qr_unavailable)
+                            return@launch
+                        }
+                        val qrBinding = ItemQrcodeBinding.inflate(layoutInflater)
+                        qrBinding.ivQcode.setImageBitmap(bitmap)
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle(R.string.simple_qr_code)
+                            .setView(qrBinding.root)
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                    }
+                }
+            }
+            .show()
     }
 
     private fun confirmDeleteAccount(accountId: String) {
         val subscription = MmkvManager.decodeSubscription(accountId) ?: return
         val accountName = subscription.panelMetadata?.user
             ?.takeIf { it.isNotBlank() }
-            ?: subscription.remarks
+            ?: accountName(accountId, subscription)
         AlertDialog.Builder(this)
             .setMessage(getString(R.string.simple_delete_account_confirm, accountName))
             .setPositiveButton(R.string.simple_delete_account) { _, _ ->
@@ -482,7 +518,7 @@ class MainActivity : HelperBaseActivity() {
         binding.tvTestState.text = content
     }
 
-    private fun showAddSubscriptionMenu(anchor: View) {
+    private fun showAddMenu(anchor: View) {
         PopupMenu(this, anchor).apply {
             menu.add(Menu.NONE, ADD_FROM_CLIPBOARD, Menu.NONE, R.string.simple_clipboard)
                 .setIcon(R.drawable.ic_copy)
@@ -490,8 +526,8 @@ class MainActivity : HelperBaseActivity() {
                 .setIcon(R.drawable.ic_scan_24dp)
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
-                    ADD_FROM_CLIPBOARD -> addSubscriptionFromClipboard()
-                    ADD_FROM_QR_CODE -> addSubscriptionFromQrCode()
+                    ADD_FROM_CLIPBOARD -> addFromClipboard()
+                    ADD_FROM_QR_CODE -> addFromQrCode()
                     else -> false
                 }
             }
@@ -499,28 +535,59 @@ class MainActivity : HelperBaseActivity() {
         }
     }
 
-    private fun addSubscriptionFromClipboard(): Boolean {
+    private fun addFromClipboard(): Boolean {
         return try {
-            val url = Utils.getClipboard(this).trim()
-            if (url.isEmpty()) {
+            val content = Utils.getClipboard(this).trim()
+            if (content.isEmpty()) {
                 toast(R.string.toast_none_data_clipboard)
                 false
             } else {
-                addSubscription(url)
+                addFromContent(content)
                 true
             }
         } catch (error: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to read subscription from clipboard", error)
+            LogUtil.e(AppConfig.TAG, "Failed to read import content from clipboard", error)
             toastError(R.string.toast_failure)
             false
         }
     }
 
-    private fun addSubscriptionFromQrCode(): Boolean {
+    private fun addFromQrCode(): Boolean {
         launchQRCodeScanner { scanResult ->
-            scanResult?.trim()?.takeIf { it.isNotEmpty() }?.let(::addSubscription)
+            scanResult?.trim()?.takeIf { it.isNotEmpty() }?.let(::addFromContent)
         }
         return true
+    }
+
+    private fun addFromContent(content: String) {
+        val input = content.trim().removePrefix("\uFEFF").trim()
+        if (AngConfigManager.isSubscriptionInput(input)) {
+            addSubscription(input)
+            return
+        }
+
+        val manualAccountName = getString(R.string.simple_manual_configs)
+        showLoading()
+        lifecycleScope.launch {
+            try {
+                val count = withContext(Dispatchers.IO) {
+                    AngConfigManager.importStandaloneConfigs(input, manualAccountName)
+                }
+                if (count > 0) {
+                    mainViewModel.subscriptionIdChanged(AppConfig.DEFAULT_SUBSCRIPTION_ID)
+                    setupGroupTab()
+                    mainViewModel.testAllRealPing()
+                    toast(getString(R.string.title_import_config_count, count))
+                } else {
+                    toastError(R.string.simple_invalid_import)
+                }
+            } catch (error: Exception) {
+                LogUtil.e(AppConfig.TAG, "Failed to import standalone config", error)
+                toastError(R.string.simple_invalid_import)
+            } finally {
+                hideLoading()
+            }
+        }
     }
 
     private fun addSubscription(url: String) {
@@ -812,12 +879,7 @@ class MainActivity : HelperBaseActivity() {
      * import config from qrcode
      */
     private fun importQRcode(): Boolean {
-        launchQRCodeScanner { scanResult ->
-            if (scanResult != null) {
-                importBatchConfig(scanResult)
-            }
-        }
-        return true
+        return addFromQrCode()
     }
 
     /**
@@ -825,14 +887,7 @@ class MainActivity : HelperBaseActivity() {
      */
     private fun importClipboard()
             : Boolean {
-        try {
-            val clipboard = Utils.getClipboard(this)
-            importBatchConfig(clipboard)
-        } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to import config from clipboard", e)
-            return false
-        }
-        return true
+        return addFromClipboard()
     }
 
     private fun importBatchConfig(server: String?) {

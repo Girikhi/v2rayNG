@@ -318,6 +318,10 @@
     <string name="simple_add">Add</string>
     <string name="simple_clipboard">Clipboard</string>
     <string name="simple_qr_code">QR code</string>
+    <string name="simple_manual_configs">Manual configs</string>
+    <string name="simple_status_local">Local</string>
+    <string name="simple_invalid_import">No valid config found. Copy a config link or a subscription URL.</string>
+    <string name="simple_qr_unavailable">Cannot create a QR code for this account. Use Clipboard instead.</string>
     <string name="simple_ping">Ping</string>
     <string name="simple_testing">Testing…</string>
     <string name="simple_checking_servers">Checking servers…</string>

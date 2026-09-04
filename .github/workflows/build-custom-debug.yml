@@ -86,12 +86,13 @@ jobs:
         run: |
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
           chmod +x gradlew
-          ./gradlew assembleFdroidRelease --no-daemon --stacktrace
+          ./gradlew testFdroidReleaseUnitTest --tests 'com.v2ray.ang.handler.AccountConfigTest' assembleFdroidRelease --no-daemon --stacktrace
 
       - name: Verify universal APK
         run: |
           apk_path="$(find V2rayNG/app/build/outputs/apk/fdroid/release -name '*_universal.apk' -print -quit)"
           test -n "$apk_path"
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$apk_path"
           badging="$($ANDROID_HOME/build-tools/37.0.0/aapt2 dump badging "$apk_path")"
           printf '%s\n' "$badging" | grep -F "package: name='com.girikhi.v2rayng.auto'"
           printf '%s\n' "$badging" | grep -F "versionName='1.0'"
