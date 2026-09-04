@@ -23,6 +23,7 @@ import com.v2ray.ang.AppConfig.WIREGUARD_LOCAL_MTU
 import com.v2ray.ang.R
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.enums.EConfigType
+import com.v2ray.ang.enums.ManualConfigMode
 import com.v2ray.ang.enums.NetworkType
 import com.v2ray.ang.extension.isNotNullEmpty
 import com.v2ray.ang.extension.nullIfBlank
@@ -31,6 +32,7 @@ import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.CertificateFingerprintManager
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.ManualConfigModes
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.Utils
@@ -171,6 +173,13 @@ class ServerActivity : BaseActivity() {
             else -> null
         } ?: return
         setContentViewWithToolbar(layoutId, showHomeAsUp = true, title = (config?.configType ?: createConfigType).toString())
+        if (config != null && ManualConfigModes.isManual(config)) {
+            supportActionBar?.subtitle = getString(when (config.manualMode) {
+                ManualConfigMode.FRAGMENT -> R.string.simple_mode_fragment
+                ManualConfigMode.GOOGLE_DOH -> R.string.simple_mode_google_doh
+                else -> R.string.simple_mode_original
+            })
+        }
 
         sp_network?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
@@ -542,6 +551,10 @@ class ServerActivity : BaseActivity() {
         }
         //LogUtil.i(AppConfig.TAG, JsonUtil.toJsonPretty(config) ?: "")
         MmkvManager.encodeServerConfig(editGuid, config)
+        if (editGuid.isNotEmpty() && ManualConfigModes.isManual(config)) {
+            // A previous ping is not a valid result for the newly edited connection settings.
+            MmkvManager.encodeServerTestDelayMillis(editGuid, 0L)
+        }
         if (isRunning) {
             SettingsChangeManager.makeRestartService()
         }

@@ -1,6 +1,7 @@
 package com.v2ray.ang.ui
 
 import android.annotation.SuppressLint
+import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -57,7 +58,18 @@ class MainRecyclerAdapter(
             !ManualConfigModes.supportsFragment(server.profile)
         holder.binding.tvName.text = if (manual) server.profile.remarks
             else context.getString(R.string.simple_server_number, position + 1)
+        // RecyclerView reuses holders across accounts: reset both constraints for subscriptions.
+        holder.binding.tvName.maxLines = if (manual) Int.MAX_VALUE else 1
+        holder.binding.tvName.ellipsize = if (manual) null else TextUtils.TruncateAt.END
         holder.binding.tvName.textDirection = if (manual) View.TEXT_DIRECTION_FIRST_STRONG else View.TEXT_DIRECTION_LOCALE
+        holder.binding.buttonEdit.isVisible = manual
+        holder.binding.buttonEdit.setOnClickListener {
+            val currentPosition = holder.bindingAdapterPosition
+            val current = data.getOrNull(currentPosition)
+            if (current != null && ManualConfigModes.isManual(current.profile)) {
+                adapterListener?.onEdit(current.guid, currentPosition, current.profile)
+            }
+        }
         holder.binding.tvMode.isVisible = manual
         holder.binding.tvMode.setText(when (server.profile.manualMode) {
             ManualConfigMode.FRAGMENT -> if (fragmentUnavailable) R.string.simple_mode_fragment_unavailable

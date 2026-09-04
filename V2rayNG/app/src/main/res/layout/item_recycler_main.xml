@@ -78,6 +78,19 @@
             android:textSize="13sp"
             tools:text="214 ms" />
 
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/button_edit"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/menu_item_edit_config"
+            android:padding="12dp"
+            android:visibility="gone"
+            app:srcCompat="@drawable/ic_edit_24dp"
+            app:tint="@color/md_theme_onSurfaceVariant"
+            tools:visibility="visible" />
+
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

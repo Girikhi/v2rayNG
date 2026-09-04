@@ -134,6 +134,38 @@ class ManualConfigModesTest {
     }
 
     @Test
+    fun editedModesKeepTheirFullNamesAndSettingsAfterReloadAndMigration() {
+        val fullName = "🇩🇪 My complete server name — نام کامل کانفیگ برای نمایش بدون کوتاه شدن — 1234567890"
+        val entries = ManualConfigModes.completeModes(listOf(ServersCache("original", profile())))
+        ManualConfigMode.entries.forEach { mode ->
+            val editedEntries = entries.map { item ->
+                if (item.profile.manualMode != mode) item else {
+                    // The original editor loads the stored profile and changes only editable fields.
+                    val edited = requireNotNull(JsonUtil.fromJson(JsonUtil.toJson(item.profile), ProfileItem::class.java))
+                    edited.remarks = fullName
+                    edited.server = "edited.example.com"
+                    edited.serverPort = "8443"
+                    edited.path = "/new-tunnel"
+                    item.copy(profile = edited)
+                }
+            }
+            val reloaded = ManualConfigModes.completeModes(editedEntries)
+            assertEquals(3, reloaded.size)
+            assertEquals(entries.map { it.guid }, reloaded.map { it.guid })
+            val edited = reloaded.single { it.profile.manualMode == mode }.profile
+            assertEquals(fullName, edited.remarks)
+            assertEquals("edited.example.com", edited.server)
+            assertEquals("8443", edited.serverPort)
+            assertEquals("/new-tunnel", edited.path)
+            assertEquals(mode, edited.manualMode)
+            assertEquals("original", edited.manualSourceId)
+            entries.filter { it.profile.manualMode != mode }.forEach { untouched ->
+                assertEquals(JsonUtil.toJson(untouched), JsonUtil.toJson(reloaded.single { it.guid == untouched.guid }))
+            }
+        }
+    }
+
+    @Test
     fun tlsFragmentUsesTlsHelloAndLeavesProfileUnchanged() {
         val source = profile(ManualConfigMode.FRAGMENT)
         val before = JsonUtil.toJson(source)

@@ -51,6 +51,10 @@ class GroupServerFragment : BaseFragment<FragmentGroupServerBinding>(),
         if (SettingsChangeManager.consumeRestartService() && mainViewModel.isRunning.value == true) {
             ownerActivity.restartV2Ray()
         }
+        if (mainViewModel.subscriptionId == subId) {
+            mainViewModel.reloadServerList()
+            ownerActivity.refreshGroupTabTitles()
+        }
     }
 
     companion object {
