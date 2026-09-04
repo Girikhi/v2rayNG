@@ -38,7 +38,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Collections
-import java.util.concurrent.ConcurrentHashMap
 import java.util.regex.PatternSyntaxException
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,7 +52,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val updateTestResultAction by lazy { MutableLiveData<String>() }
     val serverHealthState by lazy { MutableLiveData<ServerHealthState>() }
 
-    private val healthFilteredSubscriptions = ConcurrentHashMap.newKeySet<String>()
     private var activePingBatch: PingBatch? = null
     private var startupHealthCheckStarted = false
     private var startupRefreshAttempted = false
@@ -149,11 +147,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         for (guid in serverList) {
             val profile = MmkvManager.decodeServerConfig(guid) ?: continue
-            val shouldHideFailed = !ManualConfigModes.isManual(profile) && subscriptionId in healthFilteredSubscriptions
-            val testDelay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L
-            if (shouldHideFailed && testDelay < 0L) {
-                continue
-            }
             if (kw.isEmpty()) {
                 serversCache.add(ServersCache(guid, profile))
                 continue
@@ -266,7 +259,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             allowAutomaticRefresh = allowAutomaticRefresh,
             isAfterRefresh = isAfterRefresh,
         )
-        healthFilteredSubscriptions.remove(targetSubscriptionId)
         MmkvManager.clearAllTestDelayResults(testGuids)
         if (subscriptionId == targetSubscriptionId) {
             reloadServerList()
@@ -334,12 +326,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getVisibleServerCount(subscriptionId: String): Int {
         val serverGuids = MmkvManager.decodeServerList(subscriptionId)
-        if (subscriptionId == AppConfig.DEFAULT_SUBSCRIPTION_ID || subscriptionId !in healthFilteredSubscriptions) {
-            return serverGuids.size
-        }
-        return serverGuids.count { guid ->
-            (MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L) >= 0L
-        }
+        return serverGuids.size
     }
 
     /**
@@ -520,18 +507,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // A worker exception may leave a cleared result at zero. Once the batch is over,
-            // every non-positive result is a failure (manual entries stay visible at the bottom).
+            // Every non-positive result is a failure; entries remain visible and optional sorting moves failures last.
             batch.serverGuids.forEach { guid ->
                 val delay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L
                 if (delay <= 0L) {
                     MmkvManager.encodeServerTestDelayMillis(guid, -1L)
                 }
-            }
-
-            if (MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_REMOVE_INVALID_AFTER_TEST)) {
-                batch.serverGuids.filter { guid ->
-                    MmkvManager.decodeServerConfig(guid)?.let { !ManualConfigModes.isManual(it) } == true
-                }.forEach { MmkvManager.removeInvalidServer(it) }
             }
 
             if (batch.subscriptionId == AppConfig.DEFAULT_SUBSCRIPTION_ID ||
@@ -552,10 +533,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val workingGuids = orderedGuids.filter { guid ->
                 (MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L) > 0L
             }
-            if (batch.subscriptionId.isNotEmpty() && batch.subscriptionId != AppConfig.DEFAULT_SUBSCRIPTION_ID) {
-                healthFilteredSubscriptions.add(batch.subscriptionId)
-            }
-
             if (workingGuids.isNotEmpty()) {
                 if (subscriptionId == batch.subscriptionId) {
                     MmkvManager.setSelectServer(workingGuids.first())
@@ -592,7 +569,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 val refreshed = refreshSubscription(batch.subscriptionId)
                 if (refreshed) {
-                    healthFilteredSubscriptions.remove(batch.subscriptionId)
                     withContext(Dispatchers.Main) {
                         if (subscriptionId == batch.subscriptionId) {
                             reloadServerList()

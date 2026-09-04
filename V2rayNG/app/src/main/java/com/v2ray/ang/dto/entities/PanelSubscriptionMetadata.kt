@@ -10,5 +10,7 @@ data class PanelSubscriptionMetadata(
     var telegramUrl: String? = null,
     var metadataVersion: Int? = null,
     var refreshIntervalMinutes: Long? = null,
+    var dataUsedBytes: Long? = null,
+    var dataLimitBytes: Long? = null,
     var receivedAt: Long = System.currentTimeMillis(),
 )

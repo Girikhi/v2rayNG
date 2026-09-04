@@ -106,13 +106,15 @@
         app:indicatorColor="@color/color_fab_active" />
 
     <LinearLayout
+        android:id="@+id/account_status_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="5dp"
-        android:gravity="center_vertical"
+        android:gravity="end|center_vertical"
         android:orientation="horizontal"
         android:paddingStart="20dp"
-        android:paddingEnd="20dp">
+        android:paddingEnd="20dp"
+        android:visibility="gone">
 
         <TextView
             android:id="@+id/tv_account_status"
@@ -148,10 +150,25 @@
         android:layout_marginEnd="20dp"
         android:max="100"
         android:progress="0"
+        android:visibility="gone"
         app:indicatorColor="@color/color_fab_inactive"
         app:trackColor="@color/md_theme_primaryContainer"
         app:trackCornerRadius="8dp"
         app:trackThickness="16dp" />
+
+    <TextView
+        android:id="@+id/tv_account_data"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="7dp"
+        android:layout_marginEnd="20dp"
+        android:gravity="center"
+        android:textColor="@color/md_theme_onSurface"
+        android:textDirection="locale"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/workspace_card"
@@ -160,6 +177,7 @@
         android:layout_marginStart="20dp"
         android:layout_marginTop="12dp"
         android:layout_marginEnd="20dp"
+        android:visibility="gone"
         app:cardBackgroundColor="@color/simple_surface"
         app:cardCornerRadius="14dp"
         app:cardElevation="0dp"

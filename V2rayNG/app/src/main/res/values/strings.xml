@@ -377,6 +377,8 @@
     <string name="simple_status_value">Status: %1$s</string>
     <string name="simple_status_no_account">No account selected</string>
     <string name="simple_days_ratio">%1$s days left of %2$s</string>
+    <string name="simple_data_remaining">Data remaining: %1$s of %2$s</string>
+    <string name="simple_data_limit">Data limit: %1$s</string>
     <string name="simple_today">Today</string>
     <string name="simple_less_than_one_hour_short">&lt;1 hour</string>
     <plurals name="simple_days_short">

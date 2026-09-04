@@ -626,8 +626,13 @@ object AngConfigManager {
             val userAgent = it.subscription.userAgent
             val proxyUsername = SettingsManager.getSocksUsername()
             val proxyPassword = SettingsManager.getSocksPassword()
-            val captureMetadata: (Map<String, String>) -> Unit = { headers ->
-                if (SubscriptionMetadataManager.updateFromHeaders(it.subscription, headers)) {
+            val captureMetadata: (Map<String, String>, Boolean) -> Unit = { headers, successful ->
+                if (SubscriptionMetadataManager.updateFromHeaders(
+                        it.subscription,
+                        headers,
+                        replaceMissingFields = successful,
+                    )
+                ) {
                     MmkvManager.encodeSubscription(it.guid, it.subscription)
                 }
             }

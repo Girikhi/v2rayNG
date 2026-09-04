@@ -301,25 +301,35 @@ class MainActivity : HelperBaseActivity() {
             else -> getString(R.string.simple_status_unknown)
         }
         val color = ContextCompat.getColor(this, statusColor(rawStatus))
-        val workspace = metadata?.workspace
-            ?.takeIf { it.isNotBlank() }
-            ?: subscription?.let { accountName(accountId.orEmpty(), it) }
+        val workspace = metadata?.workspace?.takeIf { it.isNotBlank() }
+        val accountFallback = subscription?.let { accountName(accountId.orEmpty(), it) }
         val user = metadata?.user
             ?.takeIf { it.isNotBlank() }
             ?: workspace
+            ?: accountFallback
             ?: getString(R.string.simple_accounts)
         val telegramUrl = metadata?.telegramUrl?.takeIf { it.isNotBlank() }
+        val hasStatus = rawStatus != null
+        val hasDays = metadata?.let(::metadataExpiryMillis) != null
+        val dataText = formatAccountData(metadata)
 
         binding.tvAccountsTitle.text = user
         binding.accountStatusDot.backgroundTintList = ColorStateList.valueOf(color)
+        binding.accountStatusRow.isVisible = hasStatus || hasDays
+        binding.tvAccountStatus.isVisible = hasStatus
         binding.tvAccountStatus.text = getString(R.string.simple_status_value, status)
-        binding.tvAccountRemaining.text = formatAccountDays(subscription)
+        binding.tvAccountRemaining.isVisible = hasDays
+        binding.tvAccountRemaining.text = if (hasDays) formatAccountDays(subscription) else ""
+        binding.accountExpiryProgress.isVisible = hasDays
         binding.accountExpiryProgress.setIndicatorColor(color)
         binding.accountExpiryProgress.setProgressCompat(
-            accountExpiryProgress(subscription),
+            if (hasDays) accountExpiryProgress(subscription) else 0,
             true,
         )
-        binding.tvWorkspaceName.text = workspace ?: getString(R.string.simple_value_unavailable)
+        binding.tvAccountData.isVisible = dataText != null
+        binding.tvAccountData.text = dataText.orEmpty()
+        binding.workspaceCard.isVisible = workspace != null
+        binding.tvWorkspaceName.text = workspace.orEmpty()
         binding.buttonRefresh.isEnabled = !subscription?.url.isNullOrBlank()
         binding.buttonTelegramChannel.isVisible = telegramUrl != null
         binding.buttonTelegramChannel.text = telegramUrl?.let(::telegramLabel).orEmpty()
@@ -451,6 +461,19 @@ class MainActivity : HelperBaseActivity() {
             R.string.simple_days_ratio,
             formatLocalizedNumber(remainingDays),
             totalDays?.let(::formatLocalizedNumber) ?: DASH_VALUE,
+        )
+    }
+
+    private fun formatAccountData(metadata: PanelSubscriptionMetadata?): String? {
+        val total = metadata?.dataLimitBytes?.takeIf { it > 0L } ?: return null
+        val totalText = android.text.format.Formatter.formatShortFileSize(this, total)
+        val used = metadata.dataUsedBytes?.takeIf { it >= 0L }
+            ?: return getString(R.string.simple_data_limit, totalText)
+        val remaining = total - used.coerceAtMost(total)
+        return getString(
+            R.string.simple_data_remaining,
+            android.text.format.Formatter.formatShortFileSize(this, remaining),
+            totalText,
         )
     }
 

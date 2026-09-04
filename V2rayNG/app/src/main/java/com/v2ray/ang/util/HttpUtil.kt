@@ -146,7 +146,7 @@ object HttpUtil {
     @Throws(IOException::class)
     fun getUrlContentWithUserAgent(
         request: UrlContentRequest,
-        onResponseHeaders: ((Map<String, String>) -> Unit)? = null
+        onResponseHeaders: ((Map<String, String>, Boolean) -> Unit)? = null
     ): String {
         var currentUrl = request.url
         var redirects = 0
@@ -187,12 +187,12 @@ object HttpUtil {
                     }
 
                     response.isSuccessful -> {
-                        onResponseHeaders?.invoke(responseHeaders(response))
+                        onResponseHeaders?.invoke(responseHeaders(response), true)
                         return response.body?.string() ?: ""
                     }
 
                     else -> {
-                        onResponseHeaders?.invoke(responseHeaders(response))
+                        onResponseHeaders?.invoke(responseHeaders(response), false)
                         throw IOException("Request failed with status code ${response.code}")
                     }
                 }
