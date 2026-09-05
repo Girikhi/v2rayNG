@@ -326,7 +326,6 @@ class MainActivity : HelperBaseActivity() {
         binding.tvAccountRemaining.isVisible = hasDays
         binding.tvAccountRemaining.text = if (hasDays) formatAccountDays(subscription) else ""
         binding.accountExpiryProgress.isVisible = hasDays
-        binding.accountExpiryProgress.setIndicatorColor(color)
         binding.accountExpiryProgress.setProgressCompat(
             if (hasDays) accountExpiryProgress(subscription) else 0,
             true,
@@ -717,14 +716,14 @@ class MainActivity : HelperBaseActivity() {
             binding.fab.isEnabled = true
             binding.fab.setImageResource(R.drawable.ic_stop_24dp)
             binding.fab.backgroundTintList = ColorStateList.valueOf(
-                ContextCompat.getColor(this, R.color.color_fab_active)
+                ContextCompat.getColor(this, R.color.simple_connect_button)
             )
             binding.fab.contentDescription = getString(R.string.action_stop_service)
             setTestState(getString(R.string.simple_connected))
         } else {
             binding.fab.setImageResource(R.drawable.ic_play_24dp)
             binding.fab.backgroundTintList = ColorStateList.valueOf(
-                ContextCompat.getColor(this, R.color.color_fab_inactive)
+                ContextCompat.getColor(this, R.color.simple_connect_button)
             )
             binding.fab.contentDescription = getString(R.string.tasker_start_service)
             val healthState = mainViewModel.serverHealthState.value

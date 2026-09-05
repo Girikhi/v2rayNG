@@ -7,6 +7,14 @@
     <color name="divider_color_light">#364146</color>
     <color name="simple_background">@color/md_theme_background</color>
     <color name="simple_surface">@color/md_theme_surface</color>
+    <color name="simple_expiry_progress">#82D9AD</color>
+    <color name="simple_expiry_track">#294A3B</color>
+    <color name="simple_data_progress">#7BC9F3</color>
+    <color name="simple_data_track">#294653</color>
+    <color name="simple_telegram">#4FB5E5</color>
+    <color name="simple_telegram_container">#173B4C</color>
+    <color name="simple_connect_button">#7BC9F3</color>
+    <color name="simple_on_connect_button">#0B2A39</color>
 
     <!-- Primary colors - soft slate -->
     <color name="md_theme_primary">#CFD9DD</color>

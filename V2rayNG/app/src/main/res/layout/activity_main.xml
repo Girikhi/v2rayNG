@@ -151,8 +151,8 @@
         android:max="100"
         android:progress="0"
         android:visibility="gone"
-        app:indicatorColor="@color/color_fab_inactive"
-        app:trackColor="@color/md_theme_primaryContainer"
+        app:indicatorColor="@color/simple_expiry_progress"
+        app:trackColor="@color/simple_expiry_track"
         app:trackCornerRadius="8dp"
         app:trackThickness="16dp" />
 
@@ -173,17 +173,17 @@
     <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/account_data_progress"
         android:layout_width="match_parent"
-        android:layout_height="12dp"
+        android:layout_height="16dp"
         android:layout_marginStart="20dp"
         android:layout_marginTop="6dp"
         android:layout_marginEnd="20dp"
         android:max="100"
         android:progress="0"
         android:visibility="gone"
-        app:indicatorColor="@color/color_fab_active"
-        app:trackColor="@color/md_theme_primaryContainer"
-        app:trackCornerRadius="6dp"
-        app:trackThickness="12dp" />
+        app:indicatorColor="@color/simple_data_progress"
+        app:trackColor="@color/simple_data_track"
+        app:trackCornerRadius="8dp"
+        app:trackThickness="16dp" />
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/workspace_card"
@@ -225,13 +225,19 @@
         android:layout_marginTop="2dp"
         android:contentDescription="@string/simple_open_telegram"
         android:minHeight="44dp"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
         android:textAllCaps="false"
-        android:textColor="@color/md_theme_primary"
+        android:textColor="@color/simple_telegram"
         android:textSize="13sp"
         android:visibility="gone"
+        app:backgroundTint="@color/simple_telegram_container"
+        app:cornerRadius="16dp"
         app:icon="@drawable/ic_telegram_24dp"
         app:iconPadding="6dp"
-        app:iconTint="@color/md_theme_primary" />
+        app:iconTint="@color/simple_telegram"
+        app:strokeColor="@color/simple_telegram"
+        app:strokeWidth="1dp" />
 
     <Space
         android:layout_width="match_parent"
@@ -279,12 +285,12 @@
                 android:contentDescription="@string/tasker_start_service"
                 android:focusable="true"
                 android:src="@drawable/ic_play_24dp"
-                app:backgroundTint="@color/color_fab_inactive"
+                app:backgroundTint="@color/simple_connect_button"
                 app:borderWidth="0dp"
                 app:elevation="3dp"
                 app:fabCustomSize="112dp"
                 app:maxImageSize="46dp"
-                app:tint="@color/md_theme_onPrimary" />
+                app:tint="@color/simple_on_connect_button" />
 
             <LinearLayout
                 android:layout_width="match_parent"
