@@ -218,7 +218,7 @@ internal object StructuredSubscriptionParser {
     }
 
     private fun normalizeNetwork(value: String?): String = when (value?.lowercase()) {
-        "websocket" -> NetworkType.WS.type
+        "ws", "websocket" -> NetworkType.WS.type
         "httpupgrade", "http-upgrade" -> NetworkType.HTTP_UPGRADE.type
         "http", "h2" -> NetworkType.HTTP.type
         "grpc" -> NetworkType.GRPC.type
