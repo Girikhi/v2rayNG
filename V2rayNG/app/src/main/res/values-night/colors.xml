@@ -15,6 +15,8 @@
     <color name="simple_telegram_container">#173B4C</color>
     <color name="simple_connect_button">#0E82FF</color>
     <color name="simple_on_connect_button">#0B2A39</color>
+    <color name="simple_connect_idle">#666666</color>
+    <color name="simple_on_connect_idle">#FFFFFF</color>
 
     <!-- Primary colors - soft slate -->
     <color name="md_theme_primary">#CFD9DD</color>

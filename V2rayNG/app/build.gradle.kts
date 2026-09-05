@@ -24,7 +24,7 @@ android {
         applicationId = "com.girikhi.v2rayng.auto"
         minSdk = 24
         targetSdk = 37
-        versionCode = 10012
+        versionCode = 10013
         versionName = "1.0"
         multiDexEnabled = true
 

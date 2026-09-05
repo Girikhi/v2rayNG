@@ -6,10 +6,13 @@ import android.content.res.ColorStateList
 import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.PopupMenu
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -312,6 +315,8 @@ class MainActivity : HelperBaseActivity() {
         val telegramUrl = metadata?.telegramUrl?.takeIf { it.isNotBlank() }
         val hasStatus = rawStatus != null
         val hasDays = metadata?.let(::metadataExpiryMillis) != null
+        val hasTotalDays = hasDays && metadata?.let(::metadataStartMillis) != null
+        val centerRemainingDays = hasDays && !hasTotalDays
         val dataText = formatAccountData(metadata)
         val dataProgress = AccountDataFormatter.remainingPercent(
             metadata?.dataLimitBytes,
@@ -321,13 +326,23 @@ class MainActivity : HelperBaseActivity() {
         binding.tvAccountsTitle.text = user
         binding.accountStatusDot.backgroundTintList = ColorStateList.valueOf(color)
         binding.accountStatusRow.isVisible = hasStatus || hasDays
-        binding.tvAccountStatus.isVisible = hasStatus
+        binding.tvAccountStatus.isVisible = hasStatus && !centerRemainingDays
         binding.tvAccountStatus.text = getString(R.string.simple_status_value, status)
         binding.tvAccountRemaining.isVisible = hasDays
         binding.tvAccountRemaining.text = if (hasDays) formatAccountDays(subscription) else ""
-        binding.accountExpiryProgress.isVisible = hasDays
+        binding.tvAccountRemaining.layoutParams =
+            (binding.tvAccountRemaining.layoutParams as LinearLayout.LayoutParams).apply {
+                width = if (centerRemainingDays) 0 else ViewGroup.LayoutParams.WRAP_CONTENT
+                weight = if (centerRemainingDays) 1f else 0f
+            }
+        binding.tvAccountRemaining.gravity = if (centerRemainingDays) {
+            Gravity.CENTER
+        } else {
+            Gravity.END or Gravity.CENTER_VERTICAL
+        }
+        binding.accountExpiryProgress.isVisible = hasTotalDays
         binding.accountExpiryProgress.setProgressCompat(
-            if (hasDays) accountExpiryProgress(subscription) else 0,
+            if (hasTotalDays) accountExpiryProgress(subscription) else 0,
             true,
         )
         binding.tvAccountData.isVisible = dataText != null
@@ -718,12 +733,18 @@ class MainActivity : HelperBaseActivity() {
             binding.fab.backgroundTintList = ColorStateList.valueOf(
                 ContextCompat.getColor(this, R.color.simple_connect_button)
             )
+            binding.fab.imageTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.simple_on_connect_button)
+            )
             binding.fab.contentDescription = getString(R.string.action_stop_service)
             setTestState(getString(R.string.simple_connected))
         } else {
             binding.fab.setImageResource(R.drawable.ic_play_24dp)
             binding.fab.backgroundTintList = ColorStateList.valueOf(
-                ContextCompat.getColor(this, R.color.simple_connect_button)
+                ContextCompat.getColor(this, R.color.simple_connect_idle)
+            )
+            binding.fab.imageTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.simple_on_connect_idle)
             )
             binding.fab.contentDescription = getString(R.string.tasker_start_service)
             val healthState = mainViewModel.serverHealthState.value
