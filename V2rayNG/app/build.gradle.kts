@@ -24,7 +24,7 @@ android {
         applicationId = "com.girikhi.v2rayng.auto"
         minSdk = 24
         targetSdk = 37
-        versionCode = 10008
+        versionCode = 10009
         versionName = "1.0"
         multiDexEnabled = true
 
@@ -184,6 +184,7 @@ dependencies {
     // Data and Storage Libraries
     implementation(libs.mmkv.static)
     implementation(libs.gson)
+    implementation(libs.snakeyaml)
     implementation(libs.okhttp)
 
     // Reactive and Utility Libraries

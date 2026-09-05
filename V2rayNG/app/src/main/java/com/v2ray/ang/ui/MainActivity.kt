@@ -452,15 +452,19 @@ class MainActivity : HelperBaseActivity() {
             ?: return getString(R.string.simple_days_ratio, DASH_VALUE, DASH_VALUE)
         val expiry = metadataExpiryMillis(metadata)
             ?: return getString(R.string.simple_days_ratio, DASH_VALUE, DASH_VALUE)
-        val start = metadataStartMillis(metadata)
+        // Standard subscriptions usually provide only an expiry timestamp. Use the
+        // stable account creation time as their period start so the dashboard can
+        // still display a meaningful "remaining of total" value. Panel-provided
+        // start dates remain authoritative when available.
+        val start = metadataStartMillis(metadata) ?: subscription.addedTime
         val now = System.currentTimeMillis()
-        val remainingFrom = start?.let { maxOf(now, it) } ?: now
+        val remainingFrom = maxOf(now, start)
         val remainingDays = durationDays(remainingFrom, expiry)
-        val totalDays = start?.let { durationDays(it, expiry) }
+        val totalDays = durationDays(start, expiry)
         return getString(
             R.string.simple_days_ratio,
             formatLocalizedNumber(remainingDays),
-            totalDays?.let(::formatLocalizedNumber) ?: DASH_VALUE,
+            formatLocalizedNumber(totalDays),
         )
     }
 

@@ -45,8 +45,19 @@ Versions installed with the former upstream package ID cannot be upgraded in pla
 - Workspace, Telegram channel, account status, and expiry progress on the main screen.
 - Anonymous server labels such as **Server 1**, **Server 2**, and so on.
 - Real-delay ping results using the familiar v2rayNG latency colors.
-- Failed configurations are hidden from the active server list without being deleted.
+- Failed configurations remain visible and move to the bottom after a ping, without changing the order of working servers.
 - The first working server is selected automatically and is ready to connect.
+
+## Subscription formats
+
+The app accepts plain or base64-wrapped share-link lists (`vless://`, `vmess://`, `trojan://`, `ss://`, `socks://`, `wireguard://`, and `hysteria2://`). It also imports compatible proxy entries from:
+
+- Mihomo/Clash `proxies:` YAML
+- Shadowsocks SIP008 JSON
+- sing-box `outbounds` JSON
+- v2ray/Xray custom JSON and WireGuard configuration files already supported by v2rayNG
+
+Structured formats import only protocols and connection fields supported by the bundled Xray core. Routing rules, selectors, direct/block entries, and unknown proxy types are intentionally ignored.
 
 ## Automatic recovery
 

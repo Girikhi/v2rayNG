@@ -308,37 +308,50 @@ object AngConfigManager {
             if (servers == null) {
                 return 0
             }
-            // Find the currently selected server that belongs to the same subscription before replacement.
-            val removedSelected = getRemovedSelectedProfile(subid, append)
-
             val subItem = MmkvManager.decodeSubscription(subid)
 
             // Parse all configs first (no I/O during parsing)
             val parsedConfigs = servers.lines()
                 .distinct()
                 .mapNotNull { parseConfig(it, subid, subItem) }
-            val configs = if (!subItem?.url.isNullOrBlank()) {
-                ManualConfigModes.expandSubscriptionProfiles(parsedConfigs)
-            } else {
-                parsedConfigs
-            }
-
-            // Batch save all parsed configs (only one serverList read/write)
-            if (configs.isNotEmpty()) {
-                if (!append) {
-                    MmkvManager.removeServerViaSubid(subid)
-                }
-                // batchSaveConfigs prepends entries; reverse to preserve source and mode order.
-                val keyToProfile = batchSaveConfigs(configs.asReversed(), subid)
-                val matchKey = findMatchedProfileKey(keyToProfile, removedSelected)
-                matchKey?.let { MmkvManager.setSelectServer(it) }
-            }
-
-            return configs.size
+            return saveParsedProfiles(parsedConfigs, subid, subItem, append)
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to parse batch config", e)
         }
         return 0
+    }
+
+    /** Applies account filtering/modes and stores an already parsed subscription batch. */
+    private fun saveParsedProfiles(
+        parsedProfiles: List<ProfileItem>,
+        subid: String,
+        subItem: SubscriptionItem?,
+        append: Boolean,
+    ): Int {
+        val filteredProfiles = parsedProfiles.filter { profile ->
+            profile.subscriptionId = subid
+            profile.description = generateDescription(profile)
+            val filter = subItem?.filter
+            filter.isNullOrEmpty() || profile.remarks.isEmpty() ||
+                runCatching { Regex(filter.orEmpty()).containsMatchIn(profile.remarks) }.getOrDefault(false)
+        }
+        val configs = if (!subItem?.url.isNullOrBlank()) {
+            ManualConfigModes.expandSubscriptionProfiles(filteredProfiles)
+        } else {
+            filteredProfiles
+        }
+        if (configs.isEmpty()) return 0
+
+        // Find the selected server before replacing this account's existing entries.
+        val removedSelected = getRemovedSelectedProfile(subid, append)
+        if (!append) {
+            MmkvManager.removeServerViaSubid(subid)
+        }
+        // batchSaveConfigs prepends entries; reverse to preserve source and mode order.
+        val keyToProfile = batchSaveConfigs(configs.asReversed(), subid)
+        val matchKey = findMatchedProfileKey(keyToProfile, removedSelected)
+        matchKey?.let { MmkvManager.setSelectServer(it) }
+        return configs.size
     }
 
     /**
@@ -716,9 +729,22 @@ object AngConfigManager {
      * @return The number of configurations parsed.
      */
     private fun parseConfigViaSub(server: String?, subid: String, append: Boolean): Int {
-        var count = parseBatchConfig(Utils.decode(server), subid, append)
+        val decoded = Utils.decode(server)
+        var count = parseBatchConfig(decoded, subid, append)
         if (count <= 0) {
             count = parseBatchConfig(server, subid, append)
+        }
+        if (count <= 0) {
+            val structuredProfiles = StructuredSubscriptionParser.parse(decoded)
+                .ifEmpty { StructuredSubscriptionParser.parse(server) }
+            if (structuredProfiles.isNotEmpty()) {
+                count = saveParsedProfiles(
+                    structuredProfiles,
+                    subid,
+                    MmkvManager.decodeSubscription(subid),
+                    append,
+                )
+            }
         }
         if (count <= 0) {
             count = parseCustomConfigServer(server, subid, append)
