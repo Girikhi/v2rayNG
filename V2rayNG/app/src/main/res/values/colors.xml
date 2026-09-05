@@ -14,7 +14,7 @@
     <color name="simple_expiry_track">#DDF2E6</color>
     <color name="simple_data_progress">#0039FF</color>
     <color name="simple_data_track">#DDEFFA</color>
-    <color name="simple_telegram">#0039FF</color>
+    <color name="simple_telegram">#229ED9</color>
     <color name="simple_telegram_container">#E0F3FC</color>
     <color name="simple_connect_button">#0E82FF</color>
     <color name="simple_on_connect_button">#103347</color>
