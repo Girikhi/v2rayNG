@@ -519,6 +519,7 @@
     <string name="simple_status_value">وضعیت: %1$s</string>
     <string name="simple_status_no_account">حسابی انتخاب نشده</string>
     <string name="simple_days_ratio">%1$s روز مانده از %2$s روز</string>
+    <string name="simple_days_only">%1$s روز مانده</string>
     <string name="simple_data_remaining">دادهٔ باقی‌مانده: %1$s از %2$s</string>
     <string name="simple_data_limit">سقف داده: %1$s</string>
     <string name="simple_data_unlimited">حجم داده: نامحدود</string>

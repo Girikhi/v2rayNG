@@ -38,6 +38,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.util.AccountDataFormatter
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.QRCodeDecoder
 import com.v2ray.ang.util.Utils
@@ -312,6 +313,10 @@ class MainActivity : HelperBaseActivity() {
         val hasStatus = rawStatus != null
         val hasDays = metadata?.let(::metadataExpiryMillis) != null
         val dataText = formatAccountData(metadata)
+        val dataProgress = AccountDataFormatter.remainingPercent(
+            metadata?.dataLimitBytes,
+            metadata?.dataUsedBytes,
+        )
 
         binding.tvAccountsTitle.text = user
         binding.accountStatusDot.backgroundTintList = ColorStateList.valueOf(color)
@@ -328,6 +333,8 @@ class MainActivity : HelperBaseActivity() {
         )
         binding.tvAccountData.isVisible = dataText != null
         binding.tvAccountData.text = dataText.orEmpty()
+        binding.accountDataProgress.isVisible = dataProgress != null
+        binding.accountDataProgress.setProgressCompat(dataProgress ?: 0, true)
         binding.workspaceCard.isVisible = workspace != null
         binding.tvWorkspaceName.text = workspace.orEmpty()
         binding.buttonRefresh.isEnabled = !subscription?.url.isNullOrBlank()
@@ -452,14 +459,13 @@ class MainActivity : HelperBaseActivity() {
             ?: return getString(R.string.simple_days_ratio, DASH_VALUE, DASH_VALUE)
         val expiry = metadataExpiryMillis(metadata)
             ?: return getString(R.string.simple_days_ratio, DASH_VALUE, DASH_VALUE)
-        // Standard subscriptions usually provide only an expiry timestamp. Use the
-        // stable account creation time as their period start so the dashboard can
-        // still display a meaningful "remaining of total" value. Panel-provided
-        // start dates remain authoritative when available.
-        val start = metadataStartMillis(metadata) ?: subscription.addedTime
+        val start = metadataStartMillis(metadata)
         val now = System.currentTimeMillis()
-        val remainingFrom = maxOf(now, start)
+        val remainingFrom = start?.let { maxOf(now, it) } ?: now
         val remainingDays = durationDays(remainingFrom, expiry)
+        if (start == null) {
+            return getString(R.string.simple_days_only, formatLocalizedNumber(remainingDays))
+        }
         val totalDays = durationDays(start, expiry)
         return getString(
             R.string.simple_days_ratio,
@@ -472,13 +478,14 @@ class MainActivity : HelperBaseActivity() {
         val total = metadata?.dataLimitBytes ?: return null
         if (total == 0L) return getString(R.string.simple_data_unlimited)
         if (total < 0L) return null
-        val totalText = android.text.format.Formatter.formatShortFileSize(this, total)
+        val locale = SettingsManager.getLocale()
+        val totalText = AccountDataFormatter.formatBytes(total, locale)
         val used = metadata.dataUsedBytes?.takeIf { it >= 0L }
             ?: return getString(R.string.simple_data_limit, totalText)
         val remaining = total - used.coerceAtMost(total)
         return getString(
             R.string.simple_data_remaining,
-            android.text.format.Formatter.formatShortFileSize(this, remaining),
+            AccountDataFormatter.formatBytes(remaining, locale),
             totalText,
         )
     }

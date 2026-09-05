@@ -170,6 +170,21 @@
         android:textStyle="bold"
         android:visibility="gone" />
 
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/account_data_progress"
+        android:layout_width="match_parent"
+        android:layout_height="12dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="20dp"
+        android:max="100"
+        android:progress="0"
+        android:visibility="gone"
+        app:indicatorColor="@color/color_fab_active"
+        app:trackColor="@color/md_theme_primaryContainer"
+        app:trackCornerRadius="6dp"
+        app:trackThickness="12dp" />
+
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/workspace_card"
         android:layout_width="match_parent"
