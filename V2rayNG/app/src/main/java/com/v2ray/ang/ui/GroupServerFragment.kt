@@ -245,6 +245,7 @@ class GroupServerFragment : BaseFragment<FragmentGroupServerBinding>(),
                 ownerActivity.restartV2Ray()
             }
         }
+        ownerActivity.refreshActiveConnectionLabel()
     }
 
     private inner class ActivityAdapterListener : MainAdapterListener {

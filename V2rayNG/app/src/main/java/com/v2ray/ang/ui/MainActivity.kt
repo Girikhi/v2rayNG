@@ -37,6 +37,7 @@ import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.handler.AngConfigManager
+import com.v2ray.ang.handler.ManualConfigModes
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
@@ -364,6 +365,38 @@ class MainActivity : HelperBaseActivity() {
             count,
             count,
         )
+        refreshActiveConnectionLabel()
+    }
+
+    fun refreshActiveConnectionLabel() {
+        val selectedGuid = MmkvManager.getSelectServer()?.takeIf { it.isNotBlank() }
+        val profile = selectedGuid?.let(MmkvManager::decodeServerConfig)
+        if (selectedGuid == null || profile == null) {
+            binding.tvActiveConnection.isVisible = false
+            return
+        }
+
+        val accountId = profile.subscriptionId.ifBlank { AppConfig.DEFAULT_SUBSCRIPTION_ID }
+        val subscription = MmkvManager.decodeSubscription(accountId)
+        val account = subscription?.panelMetadata?.user
+            ?.takeIf { it.isNotBlank() }
+            ?: subscription?.panelMetadata?.workspace?.takeIf { it.isNotBlank() }
+            ?: subscription?.let { accountName(accountId, it) }
+            ?: getString(R.string.simple_default_account_name)
+
+        val position = MmkvManager.decodeServerList(accountId).indexOf(selectedGuid)
+        val server = if (ManualConfigModes.isManual(profile)) {
+            profile.remarks.ifBlank {
+                getString(R.string.simple_server_number, position.coerceAtLeast(0) + 1)
+            }
+        } else if (position >= 0) {
+            getString(R.string.simple_server_number, position + 1)
+        } else {
+            profile.remarks.ifBlank { getString(R.string.simple_value_unavailable) }
+        }
+
+        binding.tvActiveConnection.text = getString(R.string.simple_active_connection, account, server)
+        binding.tvActiveConnection.isVisible = true
     }
 
     private fun telegramLabel(url: String): String = url
@@ -722,6 +755,7 @@ class MainActivity : HelperBaseActivity() {
     }
 
     private fun applyRunningState(isLoading: Boolean, isRunning: Boolean) {
+        refreshActiveConnectionLabel()
         if (isLoading) {
             binding.fab.setImageResource(R.drawable.ic_fab_check)
             return

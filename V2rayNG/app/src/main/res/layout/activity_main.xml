@@ -268,7 +268,7 @@
                 android:id="@+id/tv_test_state"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
+                android:layout_marginBottom="3dp"
                 android:gravity="center"
                 android:maxLines="2"
                 android:text="@string/simple_tap_to_connect"
@@ -276,6 +276,21 @@
                 android:textDirection="locale"
                 android:textSize="17sp"
                 android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_active_connection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginBottom="10dp"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:maxLines="2"
+                android:textColor="@color/md_theme_onSurfaceVariant"
+                android:textDirection="locale"
+                android:textSize="13sp"
+                android:visibility="gone" />
 
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/fab"

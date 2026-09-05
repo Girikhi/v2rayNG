@@ -486,6 +486,7 @@
     <string name="simple_not_tested">سنجیده نشده</string>
     <string name="simple_ping_failed">پاسخ نداد</string>
     <string name="simple_server_number">سرور شمارهٔ %1$d</string>
+    <string name="simple_active_connection">حساب: %1$s  •  سرور: %2$s</string>
     <string name="simple_switch_to_english">تغییر زبان به انگلیسی</string>
     <string name="simple_switch_to_persian">تغییر زبان به فارسی</string>
     <string name="simple_default_subscription_name">اشتراک</string>
