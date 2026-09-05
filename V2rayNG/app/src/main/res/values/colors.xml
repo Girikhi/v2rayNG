@@ -10,13 +10,13 @@
     <color name="colorIndicator">@color/md_theme_primary</color>
     <color name="simple_background">#F5F7F8</color>
     <color name="simple_surface">#FFFFFF</color>
-    <color name="simple_expiry_progress">#79CFA2</color>
+    <color name="simple_expiry_progress">#31FF00</color>
     <color name="simple_expiry_track">#DDF2E6</color>
-    <color name="simple_data_progress">#74BFEA</color>
+    <color name="simple_data_progress">#0039FF</color>
     <color name="simple_data_track">#DDEFFA</color>
-    <color name="simple_telegram">#229ED9</color>
+    <color name="simple_telegram">#0039FF</color>
     <color name="simple_telegram_container">#E0F3FC</color>
-    <color name="simple_connect_button">#79C4ED</color>
+    <color name="simple_connect_button">#0E82FF</color>
     <color name="simple_on_connect_button">#103347</color>
 
     <!-- Primary colors - soft slate -->
